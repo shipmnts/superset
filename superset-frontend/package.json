@@ -80,6 +80,7 @@
   ],
   "dependencies": {
     "@ant-design/icons": "^5.2.6",
+    "@ekansh-shipmnts/superset-custom-charts": "^0.1.2",
     "@emotion/cache": "^11.4.0",
     "@emotion/react": "^11.4.1",
     "@emotion/styled": "^11.3.0",
