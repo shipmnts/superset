@@ -184,7 +184,6 @@ def validate_json(obj: Union[bytes, bytearray, str]) -> None:
 def dumps(  # pylint: disable=too-many-arguments
     obj: Any,
     default: Optional[Callable[[Any], Any]] = json_iso_dttm_ser,
-    allow_nan: bool = False,
     ignore_nan: bool = True,
     sort_keys: bool = False,
     indent: Union[str, int, None] = None,
@@ -209,7 +208,6 @@ def dumps(  # pylint: disable=too-many-arguments
     results_string = ""
     dumps_kwargs: Dict[str, Any] = {
         "default": default,
-        "allow_nan": allow_nan,
         "ignore_nan": ignore_nan,
         "sort_keys": sort_keys,
         "indent": indent,
@@ -228,7 +226,6 @@ def dumps(  # pylint: disable=too-many-arguments
 def loads(
     obj: Union[bytes, bytearray, str],
     encoding: Union[str, None] = None,
-    allow_nan: bool = False,
     object_hook: Union[Callable[[dict[Any, Any]], Any], None] = None,
 ) -> Any:
     """
@@ -243,7 +240,6 @@ def loads(
     return simplejson.loads(
         obj,
         encoding=encoding,
-        allow_nan=allow_nan,
         object_hook=object_hook,
     )
 

@@ -59,7 +59,7 @@ def test_json_loads_allow_nan():
     with pytest.raises(json.JSONDecodeError) as excinfo:
         json.loads(serialized_data)
     assert str(excinfo.value) == "Expecting value: line 1 column 11 (char 10)"
-    data = json.loads(serialized_data, allow_nan=True)
+    data = json.loads(serialized_data)
     assert isinstance(data, object)
     assert math.isnan(data["float"]) is True
 

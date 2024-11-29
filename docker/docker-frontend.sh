@@ -16,6 +16,7 @@
 # limitations under the License.
 #
 set -e
+set -x 
 
 # Packages needed for puppeteer:
 if [ "$PUPPETEER_SKIP_CHROMIUM_DOWNLOAD" = "false" ]; then
