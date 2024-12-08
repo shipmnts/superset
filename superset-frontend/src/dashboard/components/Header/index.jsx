@@ -567,21 +567,23 @@ class Header extends PureComponent {
           ]}
           rightPanelAdditionalItems={
             <>
-              <div
-                style={{ cursor: 'pointer' }}
-                onClick={() => {
-                  this.setState({
-                    isDrawerVisible: true,
-                    chartSummaryLoader: true,
-                  });
-                }}
-              >
-                <img
-                  src={wandIcon}
-                  alt="Wand Icon"
-                  style={{ width: '20px', height: '20px' }} // Adjust size as needed
-                />
-                &nbsp; Summarize All Charts Using Alex &nbsp;
+              <div>
+                <span
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => {
+                    this.setState({
+                      isDrawerVisible: true,
+                      chartSummaryLoader: true,
+                    });
+                  }}
+                >
+                  <img
+                    src={wandIcon}
+                    alt="Wand Icon"
+                    style={{ width: '20px', height: '20px' }} // Adjust size as needed
+                  />
+                  &nbsp; Summarize All Charts Using Alex &nbsp;
+                </span>
                 <ChartSummaryDrawer
                   visible={this.state.isDrawerVisible}
                   onClose={() => {
