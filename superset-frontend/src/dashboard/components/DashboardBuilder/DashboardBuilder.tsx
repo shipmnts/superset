@@ -289,6 +289,7 @@ const DashboardContentWrapper = styled.div`
       }
       .grid-row .dragdroppable-object {
         width: 100% ;
+        max-width: none ;
       }
       .resizable-container div {
         width: 100% !important ; 
