@@ -642,6 +642,8 @@ class PivotData {
     this.allTotal = this.aggregator(this, [], []);
     this.subtotals = subtotals;
     this.sorted = false;
+    this.metricTotals = {}
+    this.metrics = {}
 
     // iterate through input, accumulating data for cells
     PivotData.forEachRecord(this.props.data, this.processRecord);
@@ -730,7 +732,7 @@ class PivotData {
 
   getRowKeys() {
     this.sortKeys();
-    return this.rowKeys;
+    return this.rowKeys
   }
 
   processRecord(record) {
@@ -745,8 +747,7 @@ class PivotData {
     });
 
     this.allTotal.push(record);
-
-    const rowStart = this.subtotals.rowEnabled ? 1 : Math.max(1, rowKey.length);
+    const rowStart = this.subtotals.expandCollapse || this.subtotals.rowEnabled ? 1 : Math.max(1, rowKey.length);
     const colStart = this.subtotals.colEnabled ? 1 : Math.max(1, colKey.length);
 
     let isRowSubtotal;
@@ -764,8 +765,19 @@ class PivotData {
       }
       this.rowTotals[flatRowKey].push(record);
       this.rowTotals[flatRowKey].isSubtotal = isRowSubtotal;
-    }
 
+      if(record['Metric']){
+        const metricName = record['Metric'];
+        this.metrics[record['Metric']] = 1;
+        if(!this.metricTotals[flatRowKey]){
+          this.metricTotals[flatRowKey] = {}
+        } 
+        if(!this.metricTotals[flatRowKey][metricName]) this.metricTotals[flatRowKey][metricName] =  this.getFormattedAggregator(
+          record,
+        )(this, flatRowKey, metricName)
+        this.metricTotals[flatRowKey][metricName].push(record);
+      }
+    }
     for (let ci = colStart; ci <= colKey.length; ci += 1) {
       isColSubtotal = ci < colKey.length;
       const fColKey = colKey.slice(0, ci);
@@ -831,6 +843,14 @@ class PivotData {
         },
       }
     );
+  }
+
+  getMetricTotals(rowKey){
+    return this.metricTotals?.[flatKey(rowKey)] || {}
+  }
+
+  getMetrics(){
+    return Object.keys(this.metrics || {})
   }
 }
 
