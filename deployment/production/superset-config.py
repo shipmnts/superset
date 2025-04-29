@@ -50,7 +50,8 @@ FEATURE_FLAGS = {
     "ADHOC_DASHBOARD_NATIVE_FILTERS": True,
     "CHART_PLUGINS_EXPERIMENTAL": True,
     "ALLOW_ADHOC_SUBQUERY": True,
-    "DASHBOARD_VIRTUALIZATION": False
+    "DASHBOARD_VIRTUALIZATION": False,
+    "ENABLE_SUPERSET_META_DB": True
 }
 
 ALERT_REPORTS_NOTIFICATION_DRY_RUN = True
@@ -83,7 +84,7 @@ CORS_OPTIONS = {
      'origins': [f'{ALEX_BACKEND_URL}']
 }
     
-
+SQLALCHEMY_TABLE_PREFIX = ""
 #---------------- Custom Methods ---------------------------
 
 
