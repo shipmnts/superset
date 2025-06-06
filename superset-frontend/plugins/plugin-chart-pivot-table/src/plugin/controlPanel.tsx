@@ -330,6 +330,7 @@ const config: ControlPanelConfig = {
                   </ul>
                 </>
               ),
+              isDynamic: true,
             },
           },
         ],
@@ -358,6 +359,7 @@ const config: ControlPanelConfig = {
                   </ul>
                 </>
               ),
+              isDynamic: true,
             },
           },
         ],
