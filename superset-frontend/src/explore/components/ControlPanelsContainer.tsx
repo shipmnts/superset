@@ -427,23 +427,24 @@ export const ControlPanelsContainer = (props: ControlPanelsContainerProps) => {
     [form_data.metrics],
   );
 
-  const unpivotedData = useMemo(
-    () =>
-      (data || []).reduce(
-        (acc: Record<string, any>[], record: Record<string, any>) => [
-          ...acc,
-          ...metricNames
-            ?.map((name: string) => ({
-              ...record,
-              [METRIC_KEY]: name,
-              value: record[name],
-            }))
-            .filter(record => record.value !== null),
-        ],
-        [],
-      ),
-    [data, metricNames],
-  );
+  const unpivotedData = useMemo(() => {
+    if (!Array.isArray(data)) {
+      return [];
+    }
+    return data.reduce(
+      (acc: Record<string, any>[], record: Record<string, any>) => [
+        ...acc,
+        ...metricNames
+          ?.map((name: string) => ({
+            ...record,
+            [METRIC_KEY]: name,
+            value: record[name],
+          }))
+          .filter(record => record.value !== null),
+      ],
+      [],
+    );
+  }, [data, metricNames]);
 
   const groupbyRows = useMemo(
     () => form_data.groupbyRows?.map(getColumnLabel) || [],
