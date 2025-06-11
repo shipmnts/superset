@@ -289,6 +289,7 @@ function useResetOnChangeRef(initialValue: () => any, resetOnChangeValue: any) {
 
 export const ControlPanelsContainer = (props: ControlPanelsContainerProps) => {
   const { colors } = useTheme();
+  console.log('props->', props);
   const pluginContext = useContext(PluginContext);
 
   const prevState = usePrevious(props.exploreState);
