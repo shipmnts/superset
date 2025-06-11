@@ -35,10 +35,7 @@ const parseLabel = value => {
       const label = anchorMatch[2];
 
       return (
-        <a
-          href={href}
-          target="_blank"
-        >
+        <a href={href} target="_blank">
           {label}
         </a>
       );
@@ -58,7 +55,6 @@ const parseLabel = value => {
 
   return String(value ?? '');
 };
-
 
 function displayHeaderCell(
   needToggle,
@@ -92,7 +88,12 @@ export class TableRenderer extends React.Component {
     // We need state to record which entries are collapsed and which aren't.
     // This is an object with flat-keys indicating if the corresponding rows
     // should be collapsed.
-    this.state = { collapsedRows: {}, collapsedCols: {}, isCollapsed: false,collapseLevel: 0 };
+    this.state = {
+      collapsedRows: {},
+      collapsedCols: {},
+      isCollapsed: false,
+      collapseLevel: 0,
+    };
 
     this.clickHeaderHandler = this.clickHeaderHandler.bind(this);
     this.clickHandler = this.clickHandler.bind(this);
@@ -139,7 +140,7 @@ export class TableRenderer extends React.Component {
       colEnabled: colSubtotalDisplay.enabled,
       rowPartialOnTop: rowSubtotalDisplay.displayOnTop,
       colPartialOnTop: colSubtotalDisplay.displayOnTop,
-      expandCollapse: tableOptions.expandCollapse
+      expandCollapse: tableOptions.expandCollapse,
     });
     const rowKeys = pivotData.getRowKeys();
     const colKeys = pivotData.getColKeys();
@@ -280,7 +281,7 @@ export class TableRenderer extends React.Component {
       }
       this.setState(state => ({
         isCollapsed: true,
-        collapseLevel: attrIdx+1
+        collapseLevel: attrIdx + 1,
       }));
     };
   }
@@ -308,7 +309,7 @@ export class TableRenderer extends React.Component {
       }
       this.setState(state => ({
         isCollapsed: false,
-        collapseLevel: attrIdx+1
+        collapseLevel: attrIdx + 1,
       }));
     };
   }
@@ -392,7 +393,10 @@ export class TableRenderer extends React.Component {
       highlightedHeaderCells,
       dateFormatters,
     } = this.props.tableOptions;
-    const colSpanAllocated = this.props.tableOptions.expandCollapse && this.state.isCollapsed ? this.state.collapseLevel : rowAttrs.length+1 ; // '+1' because removed metric name column, so need to increase colspan of spacecell.
+    const colSpanAllocated =
+      this.props.tableOptions.expandCollapse && this.state.isCollapsed
+        ? this.state.collapseLevel
+        : rowAttrs.length + 1; // '+1' because removed metric name column, so need to increase colspan of spacecell.
     const spaceCell =
       attrIdx === 0 && rowAttrs.length !== 0 ? (
         <th
@@ -535,19 +539,29 @@ export class TableRenderer extends React.Component {
           })}
         </th>
       ) : null;
-    const metricTotalsHeaders = attrIdx === 0 && rowTotals ? pivotData.getMetrics().map(metric => {
-        return <th
-            key={`${metric}_total`}
-            className="pvtTotalLabel"
-            rowSpan={colAttrs.length + Math.min(rowAttrs.length, 1)}
-          >
-            {t('%(aggregatorName)s', {
-              aggregatorName: t(metric),
-            })}
-          </th>
-      }) : []
+    const metricTotalsHeaders =
+      attrIdx === 0 && rowTotals
+        ? pivotData.getMetrics().map(metric => {
+            return (
+              <th
+                key={`${metric}_total`}
+                className="pvtTotalLabel"
+                rowSpan={colAttrs.length + Math.min(rowAttrs.length, 1)}
+              >
+                {t('%(aggregatorName)s', {
+                  aggregatorName: t(metric),
+                })}
+              </th>
+            );
+          })
+        : [];
 
-    const cells = [spaceCell, ...attrValueCells,...metricTotalsHeaders,totalCell];
+    const cells = [
+      spaceCell,
+      ...attrValueCells,
+      ...metricTotalsHeaders,
+      totalCell,
+    ];
     return <tr key={`colAttr-${attrIdx}`}>{cells}</tr>;
   }
 
@@ -566,13 +580,18 @@ export class TableRenderer extends React.Component {
       pivotData,
       namesMapping,
     } = pivotSettings;
-    const endIdx = this.props.tableOptions.expandCollapse && this.state.isCollapsed ? this.state.collapseLevel : rowAttrs.length;
+    const endIdx =
+      this.props.tableOptions.expandCollapse && this.state.isCollapsed
+        ? this.state.collapseLevel
+        : rowAttrs.length;
     return (
       <tr key="rowHdr">
-        {rowAttrs.slice(0,endIdx).map((r, i) => {
+        {rowAttrs.slice(0, endIdx).map((r, i) => {
           const needLabelToggle =
-             ((this.props.tableOptions.expandCollapse || rowSubtotalDisplay.enabled) && i !== rowAttrs.length - 1); // expand collapse to appear on all buttons
-             let arrowClickHandle = null;
+            (this.props.tableOptions.expandCollapse ||
+              rowSubtotalDisplay.enabled) &&
+            i !== rowAttrs.length - 1; // expand collapse to appear on all buttons
+          let arrowClickHandle = null;
           let subArrow = null;
           if (needLabelToggle) {
             arrowClickHandle =
@@ -665,7 +684,10 @@ export class TableRenderer extends React.Component {
       if (rowSpan > 0) {
         const flatRowKey = flatKey(rowKey.slice(0, i + 1));
         const colSpan = 1 + (i === rowAttrs.length - 1 ? colIncrSpan : 0);
-        const needRowToggle = !this.props.tableOptions.expandCollapse && rowSubtotalDisplay.enabled && i !== rowAttrs.length - 1;
+        const needRowToggle =
+          !this.props.tableOptions.expandCollapse &&
+          rowSubtotalDisplay.enabled &&
+          i !== rowAttrs.length - 1;
         const onArrowClick = needRowToggle
           ? this.toggleRowKey(flatRowKey)
           : null;
@@ -705,7 +727,8 @@ export class TableRenderer extends React.Component {
     });
 
     const attrValuePaddingCell =
-      !this.props.tableOptions.expandCollapse && rowKey.length < rowAttrs.length ? (
+      !this.props.tableOptions.expandCollapse &&
+      rowKey.length < rowAttrs.length ? (
         <th
           className="pvtRowLabel pvtSubtotalLabel"
           key="rowKeyBuffer"
@@ -787,18 +810,20 @@ export class TableRenderer extends React.Component {
     }
     //------ metric totals cells------------
     const metricTotals = pivotData.getMetricTotals(rowKey);
-    const metricTotalsCells = rowTotals ?  Object.keys(metricTotals).map(metric => {
-      const metricValue = metricTotals[metric].value()
-      return (
-        <td
-          role="gridcell"
-          key={`${metric}_total_val`}
-          className="pvtTotal"
-        >
-          {metricTotals[metric].format(metricValue)}
-        </td>
-      );
-    })  : []
+    const metricTotalsCells = rowTotals
+      ? Object.keys(metricTotals).map(metric => {
+          const metricValue = metricTotals[metric].value();
+          return (
+            <td
+              role="gridcell"
+              key={`${metric}_total_val`}
+              className="pvtTotal"
+            >
+              {metricTotals[metric].format(metricValue)}
+            </td>
+          );
+        })
+      : [];
 
     const rowCells = [
       ...attrValueCells,
@@ -823,7 +848,9 @@ export class TableRenderer extends React.Component {
       colTotalCallbacks,
       grandTotalCallback,
     } = pivotSettings;
-    const colspan_after_collapse = this.state.isCollapsed ? this.state.collapseLevel  : rowAttrs.length + Math.min(colAttrs.length, 1)
+    const colspan_after_collapse = this.state.isCollapsed
+      ? this.state.collapseLevel
+      : rowAttrs.length + Math.min(colAttrs.length, 1);
     const totalLabelCell = (
       <th
         key="label"
@@ -890,22 +917,25 @@ export class TableRenderer extends React.Component {
     );
   }
 
-  visibleKeys(keys, collapsed, numAttrs, subtotalDisplay,keyType) {
-    const collapseTill = this.state.isCollapsed ? this.state.collapseLevel : numAttrs
-    const show_subtotals_row = (key) => {
-      if(key.length < collapseTill){
-        const is_collapsed = key.some((k, j) => collapsed[flatKey(key.slice(0, j+1))])
+  visibleKeys(keys, collapsed, numAttrs, subtotalDisplay, keyType) {
+    const collapseTill = this.state.isCollapsed
+      ? this.state.collapseLevel
+      : numAttrs;
+    const show_subtotals_row = key => {
+      if (key.length < collapseTill) {
+        const is_collapsed = key.some(
+          (k, j) => collapsed[flatKey(key.slice(0, j + 1))],
+        );
         return is_collapsed;
       } else {
-        const is_parent_collapsed = key.some((k, j) => collapsed[flatKey(key.slice(0, j))])
+        const is_parent_collapsed = key.some(
+          (k, j) => collapsed[flatKey(key.slice(0, j))],
+        );
         return !is_parent_collapsed;
       }
-    }
-    if(this.props.tableOptions.expandCollapse && keyType === 'row'){
-      return keys.filter(
-        key =>
-          show_subtotals_row(key),
-      );
+    };
+    if (this.props.tableOptions.expandCollapse && keyType === 'row') {
+      return keys.filter(key => show_subtotals_row(key));
     }
     return keys.filter(
       key =>
@@ -946,15 +976,15 @@ export class TableRenderer extends React.Component {
       this.state.collapsedRows,
       rowAttrs.length,
       rowSubtotalDisplay,
-      'row'
+      'row',
     );
-    visibleRowKeys.sort();
+    // visibleRowKeys.sort();
     const visibleColKeys = this.visibleKeys(
       colKeys,
       this.state.collapsedCols,
       colAttrs.length,
       colSubtotalDisplay,
-      'column'
+      'column',
     );
 
     const pivotSettings = {
