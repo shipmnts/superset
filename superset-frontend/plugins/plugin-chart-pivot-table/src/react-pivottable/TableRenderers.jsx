@@ -986,7 +986,7 @@ export class TableRenderer extends React.Component {
       rowSubtotalDisplay,
       'row',
     );
-    visibleRowKeys.sort();
+    // visibleRowKeys.sort();
     const visibleColKeys = this.visibleKeys(
       colKeys,
       this.state.collapsedCols,
