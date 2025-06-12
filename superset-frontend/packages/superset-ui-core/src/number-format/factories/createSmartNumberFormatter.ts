@@ -80,13 +80,14 @@ export default function createSmartNumberFormatter(
   const urlParams = new URLSearchParams(window.location.search);
   const existingParams = Object.fromEntries(urlParams.entries());
   const isIndiaCountryTenant = existingParams?.tenant_country === 'IN';
-  console.log('existingParams->', existingParams, isIndiaCountryTenant);
 
   return new NumberFormatter({
     description,
     formatFunc: value =>
       `${getSign(value)}${
-        isIndiaCountryTenant ? formatIndianNumber(value) : formatValue(value)
+        isIndiaCountryTenant
+          ? formatIndianNumber(value)
+          : formatIndianNumber(value)
       }`,
     id:
       id || signed
