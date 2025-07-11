@@ -35,14 +35,7 @@ const parseLabel = value => {
       const label = anchorMatch[2];
 
       return (
-        <a
-          href={href}
-          target="_blank"
-          onClick={e => {
-            console.log('Click->');
-            e.stopPropagation(); // Prevent cell click handler from firing
-          }}
-        >
+        <a href={href} target="_blank" onClick={e => e.stopPropagation()}>
           {label}
         </a>
       );
@@ -91,7 +84,6 @@ function displayHeaderCell(
 export class TableRenderer extends React.Component {
   constructor(props) {
     super(props);
-    console.log('TableRenderer', props);
 
     // We need state to record which entries are collapsed and which aren't.
     // This is an object with flat-keys indicating if the corresponding rows

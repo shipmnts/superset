@@ -564,6 +564,31 @@ export default function TableChart<D extends DataRecord = DataRecord>(
                 </StyledCell>
               );
             }
+
+            // Create a temporary div to parse the HTML
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = text;
+            const anchor = tempDiv.querySelector('a');
+
+            // If there are anchor tags, create a modified version with click handlers
+            if (anchor) {
+              const anchorProps = Object.fromEntries(
+                [...anchor.attributes].map(attr => [attr.name, attr.value]),
+              );
+
+              return (
+                <StyledCell {...cellProps}>
+                  <a
+                    href={anchorProps.href}
+                    rel="noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    {...anchorProps}
+                  >
+                    {anchor.textContent}
+                  </a>
+                </StyledCell>
+              );
+            }
             // eslint-disable-next-line react/no-danger
             return <StyledCell {...cellProps} dangerouslySetInnerHTML={html} />;
           }
