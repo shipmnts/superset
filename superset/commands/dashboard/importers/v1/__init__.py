@@ -85,8 +85,8 @@ class ImportDashboardsCommand(ImportModelsCommand):
         # import related databases
         database_ids: dict[str, int] = {}
         for file_name, config in configs.items():
-            if file_name.startswith("databases/") and config["uuid"] in database_uuids:
-                database = import_database(config, overwrite=False)
+            if file_name.startswith("databases/") and config["database_name"] in database_uuids:
+                database = import_database(config, False)
                 database_ids[str(database.uuid)] = database.id
 
         # import datasets with the correct parent ref
