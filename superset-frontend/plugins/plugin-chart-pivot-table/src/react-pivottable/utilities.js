@@ -129,6 +129,8 @@ const naturalSort = (as, bs) => {
   return a.length - b.length;
 };
 
+const cleanSortKey = str => str.replace(/_(desc|asc)$/, '');
+
 const sortAs = function (order) {
   const mapping = {};
 
@@ -701,9 +703,26 @@ class PivotData {
           this.rowKeys.sort((a, b) => -naturalSort(v(a, []), v(b, [])));
           break;
         default:
-          this.rowKeys.sort(
-            this.arrSort(this.props.rows, this.subtotals.rowPartialOnTop),
-          );
+          const sortValueKey = cleanSortKey(this.props.rowOrder);
+          if (this.props.rowOrder?.endsWith('_asc'))
+            this.rowKeys.sort((a, b) =>
+              naturalSort(
+                v(a, sortValueKey.split('___')),
+                v(b, sortValueKey.split('___')),
+              ),
+            );
+          else if (this.props.rowOrder?.endsWith('_desc'))
+            this.rowKeys.sort(
+              (a, b) =>
+                -naturalSort(
+                  v(a, sortValueKey.split('___')),
+                  v(b, sortValueKey.split('___')),
+                ),
+            );
+          else
+            this.rowKeys.sort(
+              this.arrSort(this.props.rows, this.subtotals.rowPartialOnTop),
+            );
       }
       switch (this.props.colOrder) {
         case 'key_z_to_a':
@@ -718,9 +737,26 @@ class PivotData {
           this.colKeys.sort((a, b) => -naturalSort(v([], a), v([], b)));
           break;
         default:
-          this.colKeys.sort(
-            this.arrSort(this.props.cols, this.subtotals.colPartialOnTop),
-          );
+          const sortValueKey = cleanSortKey(this.props.colOrder);
+          if (this.props.colOrder?.endsWith('_asc'))
+            this.colKeys.sort((a, b) =>
+              naturalSort(
+                v(sortValueKey.split('___'), a),
+                v(sortValueKey.split('___'), b),
+              ),
+            );
+          else if (this.props.colOrder?.endsWith('_desc'))
+            this.colKeys.sort(
+              (a, b) =>
+                -naturalSort(
+                  v(sortValueKey.split('___'), a),
+                  v(sortValueKey.split('___'), b),
+                ),
+            );
+          else
+            this.colKeys.sort(
+              this.arrSort(this.props.cols, this.subtotals.colPartialOnTop),
+            );
       }
     }
   }
@@ -887,18 +923,8 @@ PivotData.propTypes = {
     PropTypes.objectOf(PropTypes.func),
   ]),
   derivedAttributes: PropTypes.objectOf(PropTypes.func),
-  rowOrder: PropTypes.oneOf([
-    'key_a_to_z',
-    'key_z_to_a',
-    'value_a_to_z',
-    'value_z_to_a',
-  ]),
-  colOrder: PropTypes.oneOf([
-    'key_a_to_z',
-    'key_z_to_a',
-    'value_a_to_z',
-    'value_z_to_a',
-  ]),
+  rowOrder: PropTypes.string,
+  colOrder: PropTypes.string,
 };
 
 export {
