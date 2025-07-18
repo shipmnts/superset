@@ -35,13 +35,7 @@ const parseLabel = value => {
       const label = anchorMatch[2];
 
       return (
-        <a
-          href={href}
-          target="_blank"
-          onClick={e => {
-            e.stopPropagation(); // Prevent cell click handler from firing
-          }}
-        >
+        <a href={href} target="_blank">
           {label}
         </a>
       );
@@ -984,7 +978,7 @@ export class TableRenderer extends React.Component {
       rowSubtotalDisplay,
       'row',
     );
-    visibleRowKeys.sort();
+    // visibleRowKeys.sort();
     const visibleColKeys = this.visibleKeys(
       colKeys,
       this.state.collapsedCols,

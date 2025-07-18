@@ -75,7 +75,11 @@ function handleMissingChoice<T = ControlType>(control: ControlState<T>) {
       alteredControl.value = value.filter(el => choiceValues.includes(el));
       return alteredControl;
     }
-    if (!control.multi && !choiceValues.includes(value[0])) {
+    if (
+      !control.multi &&
+      !choiceValues.includes(value[0]) &&
+      !control.isDynamic
+    ) {
       alteredControl.value = null;
       return alteredControl;
     }
