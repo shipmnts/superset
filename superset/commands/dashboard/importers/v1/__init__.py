@@ -140,7 +140,7 @@ class ImportDashboardsCommand(ImportModelsCommand):
                 dashboards.append(dashboard)
                 for uuid in find_chart_uuids(config["position"]):
                     if uuid not in chart_ids:
-                        break
+                        continue
                     chart_id = chart_ids[uuid]
                     if (dashboard.id, chart_id) not in existing_relationships:
                         dashboard_chart_ids.append((dashboard.id, chart_id))
