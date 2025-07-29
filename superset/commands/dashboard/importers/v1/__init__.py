@@ -125,32 +125,56 @@ class ImportDashboardsCommand(ImportModelsCommand):
                 charts.append(chart)
                 chart_ids[str(chart.uuid)] = chart.id
 
-        # store the existing relationship between dashboards and charts
+        # store existing relationships between dashboards and charts
         existing_relationships = db.session.execute(
             select([dashboard_slices.c.dashboard_id, dashboard_slices.c.slice_id])
         ).fetchall()
 
+        existing_map = {}  # dashboard_id -> set of slice_ids
+        for dashboard_id, slice_id in existing_relationships:
+            existing_map.setdefault(dashboard_id, set()).add(slice_id)
+
         # import dashboards
         dashboards: list[Dashboard] = []
         dashboard_chart_ids: list[tuple[int, int]] = []
+        new_relationships_map: dict[int, set[int]] = {}
         for file_name, config in configs.items():
             if file_name.startswith("dashboards/"):
                 config = update_id_refs(config, chart_ids, dataset_info)
                 dashboard = import_dashboard(config, overwrite=overwrite)
                 dashboards.append(dashboard)
+                new_chart_ids = set()
                 for uuid in find_chart_uuids(config["position"]):
                     if uuid not in chart_ids:
                         continue
                     chart_id = chart_ids[uuid]
+                    new_chart_ids.add(chart_id)
                     if (dashboard.id, chart_id) not in existing_relationships:
                         dashboard_chart_ids.append((dashboard.id, chart_id))
+                new_relationships_map[dashboard.id] = new_chart_ids
 
-        # set ref in the dashboard_slices table
+        # --- Delete stale dashboard/chart links ---
+        for dashboard in dashboards:
+            dashboard_id = dashboard.id
+            old_chart_ids = existing_map.get(dashboard_id, set())
+            new_chart_ids = new_relationships_map.get(dashboard_id, set())
+
+            stale_chart_ids = old_chart_ids - new_chart_ids
+            if stale_chart_ids:
+                db.session.execute(
+                    dashboard_slices.delete().where(
+                        dashboard_slices.c.dashboard_id == dashboard_id,
+                        dashboard_slices.c.slice_id.in_(stale_chart_ids)
+                    )
+                )
+
+        # --- Insert new dashboard/chart links ---
         values = [
             {"dashboard_id": dashboard_id, "slice_id": chart_id}
             for (dashboard_id, chart_id) in dashboard_chart_ids
         ]
-        db.session.execute(dashboard_slices.insert(), values)
+        if values:
+            db.session.execute(dashboard_slices.insert(), values)
 
         # Migrate any filter-box charts to native dashboard filters.
         for dashboard in dashboards:
