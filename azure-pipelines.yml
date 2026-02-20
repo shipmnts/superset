@@ -21,7 +21,7 @@ variables:
   k8sNamespace: 'default'
   k8sDeploymentName: 'superset'
   dockerfilePath: '**/Dockerfile'
-  vmImageName: 'ubuntu-latest'
+  poolName: 'SelfHosted'
   
 stages:
 - stage: Build
@@ -30,7 +30,7 @@ stages:
   - job: Build
     displayName: Build
     pool:
-      vmImage: $(vmImageName)
+      name: $(poolName)
     steps:
     - task: Docker@2
       displayName: Login to registry
@@ -75,7 +75,7 @@ stages:
   - deployment: Deploy
     displayName: Deploy
     pool:
-      vmImage: $(vmImageName)
+      name: $(poolName)
     environment: 'development.default'
     strategy:
       runOnce:
@@ -99,7 +99,7 @@ stages:
   - deployment: Deploy
     displayName: Deploy
     pool:
-      vmImage: $(vmImageName)
+      name: $(poolName)
     environment: 'staging.default'
     strategy:
       runOnce:
@@ -123,7 +123,7 @@ stages:
   - deployment: Deploy
     displayName: Deploy
     pool:
-      vmImage: $(vmImageName)
+      name: $(poolName)
     environment: 'production.default'
     strategy:
       runOnce:
