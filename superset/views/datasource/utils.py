@@ -105,6 +105,11 @@ def get_samples(  # pylint: disable=too-many-arguments
     form_data = {"dashboardId": dashboard_id} if dashboard_id else None
     limit_clause = get_limit_clause(page, per_page)
 
+    # Fork behavior (patch 08): pass url_params from the samples/drill-detail
+    # payload through into the query context's form_data so Jinja templates
+    # referencing url_params resolve correctly.
+    url_params_form_data = {"url_params": {**(payload.get("url_params") or {})}} if payload else None
+
     # todo(yongjie): Constructing count(*) and samples in the same query_context,
     if payload is None:
         # constructing samples query
@@ -131,7 +136,7 @@ def get_samples(  # pylint: disable=too-many-arguments
                 "id": datasource.id,
             },
             queries=[{**payload, **limit_clause}],
-            form_data=form_data,
+            form_data={**(form_data or {}), **(url_params_form_data or {})},
             result_type=ChartDataResultType.DRILL_DETAIL,
             force=force,
         )
@@ -152,7 +157,9 @@ def get_samples(  # pylint: disable=too-many-arguments
             "id": datasource.id,
         },
         queries=[{**payload, **count_star_metric} if payload else count_star_metric],
-        form_data=form_data,
+        form_data={**(form_data or {}), **(url_params_form_data or {})}
+        if url_params_form_data
+        else form_data,
         result_type=ChartDataResultType.FULL,
         force=force,
     )
