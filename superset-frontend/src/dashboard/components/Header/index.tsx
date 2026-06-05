@@ -98,6 +98,12 @@ import { useHeaderActionsMenu } from './useHeaderActionsDropdownMenu';
 import { useHeaderAutoRefresh } from './useHeaderAutoRefresh';
 import AutoRefreshIndicator from '../AutoRefreshIndicator';
 import { RefreshButton } from '../RefreshButton';
+// @ts-ignore - used only by the commented-out AI summary block
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import wandIcon from '../../../assets/images/wand.png'; // eslint-disable-line @typescript-eslint/no-unused-vars
+// @ts-ignore - used only by the commented-out AI summary block
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import ChartSummaryDrawer from 'src/dashboard/components/AiChartSummary/ChartSummaryDrawer'; // eslint-disable-line @typescript-eslint/no-unused-vars
 
 type DashboardPropertiesUpdate = {
   slug?: string;
@@ -232,6 +238,12 @@ const Header = (): JSX.Element => {
   const [showingReportModal, setShowingReportModal] = useState(false);
   const [currentReportDeleting, setCurrentReportDeleting] =
     useState<AlertObject | null>(null);
+  // @ts-ignore - used only by the commented-out AI summary block
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [isDrawerVisible, setIsDrawerVisible] = useState(false); // eslint-disable-line @typescript-eslint/no-unused-vars
+  // @ts-ignore - used only by the commented-out AI summary block
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const onClose = () => setIsDrawerVisible(false); // eslint-disable-line @typescript-eslint/no-unused-vars
   const dashboardInfo = useSelector(
     (state: HeaderRootState) => state.dashboardInfo,
   );
@@ -763,6 +775,35 @@ const Header = (): JSX.Element => {
             )}
           </div>
         )}
+        {/* Dashboard-level AI summary (disabled in production). Kept faithful
+            to the fork. Class->hooks translations:
+              this.setState({ isDrawerVisible: true })  -> setIsDrawerVisible(true)
+              this.setState({ isDrawerVisible: false }) -> onClose() (setIsDrawerVisible(false))
+              this.props.charts                         -> useSelector((state: HeaderRootState) => state.charts)
+              chartSummaryLoader state                  -> dropped (drawer owns its own loader)
+              extraProps={this.props}                   -> dropped (not consumed by the drawer)
+            Fork quirk preserved: dashboardInfo={dashboardInfo?.charts} mis-wires
+            `charts` into the drawer's `dashboardInfo` prop (inert here).
+        <div>
+          <span
+            style={{ cursor: 'pointer' }}
+            onClick={() => {
+              setIsDrawerVisible(true);
+            }}
+          >
+            <img
+              src={wandIcon}
+              alt="Wand Icon"
+              style={{ width: '20px', height: '20px' }}
+            />
+          </span>
+          <ChartSummaryDrawer
+            visible={isDrawerVisible}
+            onClose={onClose}
+            charts={charts}
+            dashboardInfo={dashboardInfo?.charts}
+          />
+        </div> */}
       </div>
     ),
     [
