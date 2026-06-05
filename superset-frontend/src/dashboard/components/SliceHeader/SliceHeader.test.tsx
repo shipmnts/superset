@@ -191,6 +191,7 @@ const createProps = (overrides: any = {}) => ({
   formData: { slice_id: 1, datasource: '58__table' },
   width: 100,
   height: 100,
+  queriesResponse: [{ sql_rowcount: 0 }],
   ...overrides,
 });
 

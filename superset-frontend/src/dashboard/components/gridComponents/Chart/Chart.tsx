@@ -698,6 +698,7 @@ const Chart = (props: ChartProps) => {
         height={getHeaderHeight()}
         exportPivotExcel={exportPivotExcel as unknown as (arg0: string) => void}
         chartHolderRef={props.chartHolderRef}
+        queriesResponse={chart.queriesResponse}
       />
 
       {/*

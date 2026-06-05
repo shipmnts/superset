@@ -990,6 +990,8 @@ export const getDatasourceSamples = async (
   dashboardId?: number,
 ): Promise<JsonObject> => {
   try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const existingParams = Object.fromEntries(urlParams.entries());
     const searchParams: DatasourceSamplesSearchParams = {
       force,
       datasource_type: datasourceType,
@@ -1005,9 +1007,13 @@ export const getDatasourceSamples = async (
       searchParams.page = page;
     }
 
+    const updatedPayload = {
+      ...jsonPayload,
+      url_params: existingParams,
+    };
     const response = await SupersetClient.post({
       endpoint: '/datasource/samples',
-      jsonPayload,
+      jsonPayload: updatedPayload,
       searchParams,
       parseMethod: 'json-bigint',
     });

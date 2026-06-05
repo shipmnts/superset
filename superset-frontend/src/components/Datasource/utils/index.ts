@@ -172,6 +172,7 @@ export function updateColumns(
     } else {
       // unchanged
       columnChanges.finalColumns.push(currentCol);
+      columnChanges.modified.push(col.column_name); // even reordering should count as modified data
     }
   });
   // push all calculated columns

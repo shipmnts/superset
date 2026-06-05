@@ -70,7 +70,8 @@ describe('updateColumns', () => {
     ];
     const result = updateColumns(prevCols, newCols, addSuccessToast);
     expect(result.added).toEqual([]);
-    expect(result.modified).toEqual(['col2']);
+    // Unchanged columns also count as modified (reordering is a change).
+    expect(result.modified).toEqual(['col1', 'col2']);
     // No columns removed
     expect(result.removed).toEqual([]);
     // Final columns: first is unchanged, second is updated
@@ -89,8 +90,8 @@ describe('updateColumns', () => {
       tn(
         'Modified 1 column in the virtual dataset',
         'Modified %s columns in the virtual dataset',
-        1,
-        1,
+        2,
+        2,
       ),
     );
   });
@@ -108,10 +109,11 @@ describe('updateColumns', () => {
     // col1 should be marked as removed
     expect(result.removed).toEqual(['col1']);
     expect(result.added).toEqual([]);
-    expect(result.modified).toEqual([]);
+    // The unchanged col2 still counts as modified (reordering is a change).
+    expect(result.modified).toEqual(['col2']);
     expect(result.finalColumns).toHaveLength(1);
-    // Removed toast should be fired
-    expect(addSuccessToast).toHaveBeenCalledTimes(1);
+    // Modified + removed toasts should be fired
+    expect(addSuccessToast).toHaveBeenCalledTimes(2);
     expect(addSuccessToast).toHaveBeenCalledWith(
       tn(
         'Removed 1 column from the virtual dataset',
@@ -138,7 +140,8 @@ describe('updateColumns', () => {
     ];
     const result = updateColumns(prevCols, newCols, addSuccessToast);
     expect(result.added).toEqual(['col4']);
-    expect(result.modified).toEqual(['col1']);
+    // The unchanged col2 also counts as modified (reordering is a change).
+    expect(result.modified).toEqual(['col1', 'col2']);
     // col3 is removed since it is missing in newCols and has no expression
     expect(result.removed).toEqual(['col3']);
     expect(result.finalColumns).toHaveLength(3);
@@ -149,8 +152,8 @@ describe('updateColumns', () => {
         tn(
           'Modified 1 column in the virtual dataset',
           'Modified %s columns in the virtual dataset',
-          1,
-          1,
+          2,
+          2,
         ),
       ],
       [
@@ -190,19 +193,20 @@ describe('updateColumns', () => {
     ];
     const result = updateColumns(prevCols, newCols, addSuccessToast);
     expect(result.added).toEqual([]);
-    expect(result.modified).toEqual(['col1']);
+    // The unchanged col2 also counts as modified (reordering is a change).
+    expect(result.modified).toEqual(['col1', 'col2']);
     // col3 is not removed since it has an expression
     expect(result.removed).toEqual([]);
     expect(result.finalColumns).toHaveLength(3);
-    // Two types of changes should fire two separate toasts
+    // Only the modified toast should fire
     expect(addSuccessToast).toHaveBeenCalledTimes(1);
     expect(addSuccessToast.mock.calls).toEqual([
       [
         tn(
           'Modified 1 column in the virtual dataset',
           'Modified %s columns in the virtual dataset',
-          1,
-          1,
+          2,
+          2,
         ),
       ],
     ]);

@@ -46,6 +46,12 @@ import { getSliceHeaderTooltip } from 'src/dashboard/util/getSliceHeaderTooltip'
 import { DashboardPageIdContext } from 'src/dashboard/containers/DashboardPage';
 import RowCountLabel from 'src/components/RowCountLabel';
 import { Link } from 'react-router-dom';
+// @ts-ignore - used only by the commented-out AI summary block
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import wandIcon from '../../../assets/images/wand.png'; // eslint-disable-line @typescript-eslint/no-unused-vars
+// @ts-ignore - used only by the commented-out AI summary block
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import ChartSummaryDrawer from '../AiChartSummary/ChartSummaryDrawer'; // eslint-disable-line @typescript-eslint/no-unused-vars
 
 const extensionsRegistry = getExtensionsRegistry();
 
@@ -63,6 +69,7 @@ type SliceHeaderProps = SliceHeaderControlsProps & {
   queriedDttm?: string | null;
   exportPivotExcel?: (arg0: string) => void;
   chartHolderRef?: RefObject<HTMLDivElement>;
+  queriesResponse?: any;
 };
 
 const annotationsLoading = t('Annotation layers are still loading.');
@@ -174,6 +181,7 @@ const SliceHeader = forwardRef<HTMLDivElement, SliceHeaderProps>(
       height,
       exportPivotExcel = () => ({}),
       chartHolderRef,
+      queriesResponse,
     },
     ref,
   ) => {
@@ -222,6 +230,17 @@ const SliceHeader = forwardRef<HTMLDivElement, SliceHeaderProps>(
     const canExplore = !editMode && supersetCanExplore;
     const showRowLimitWarning =
       shouldShowRowLimitWarning && sqlRowCount >= rowLimit && rowLimit > 0;
+
+    // queriesResponse is consumed only by the commented-out AI summary block.
+    void queriesResponse;
+    // @ts-ignore - used only by the commented-out AI summary block
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [visible, setVisible] = useState(false); // eslint-disable-line @typescript-eslint/no-unused-vars
+    // @ts-ignore - used only by the commented-out AI summary block
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const onClose = () => {
+      setVisible(false);
+    };
 
     useEffect(() => {
       const headerElement = headerRef.current;
@@ -329,6 +348,33 @@ const SliceHeader = forwardRef<HTMLDivElement, SliceHeaderProps>(
               {!uiConfig.hideChartControls && (
                 <FiltersBadge chartId={slice.slice_id} />
               )}
+              {/* AI chart summary (disabled in production). Kept faithful to fork.
+              <div
+                role="button"
+                tabIndex={0}
+                style={{ display: 'inline-block', cursor: 'pointer' }}
+                onClick={() => {
+                  setVisible(true);
+                }}
+              >
+                <img
+                  src={wandIcon}
+                  alt="Wand Icon"
+                  style={{ width: '20px', height: '20px' }}
+                />
+              </div>
+              <ChartSummaryDrawer
+                visible={visible}
+                onClose={onClose}
+                title={sliceName || ''}
+                charts={{
+                  1: {
+                    form_data: formData,
+                    queriesResponse,
+                    chartStatus,
+                  },
+                }}
+              /> */}
 
               {showRowLimitWarning && (
                 <RowCountLabel
