@@ -1,0 +1,201 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+x-superset-image: &superset-image apachesuperset.docker.scarf.sh/apache/superset:${TAG:-latest-dev}
+x-superset-user: &superset-user root
+x-superset-depends-on: &superset-depends-on
+  - redis
+x-superset-volumes:
+  # /app/pythonpath_docker will be appended to the PYTHONPATH in the final container
+  &superset-volumes
+  - ../docker:/app/docker
+  # ../superset re-enabled in Phase 6 so custom backend code is live. The repo's
+  # superset/static/assets must contain built frontend assets (copied from the
+  # image in Phase 6; replaced by our own npm build in Phase 7) or :8088 has no UI.
+  - ../superset:/app/superset
+  # - ../superset-frontend:/app/superset-frontend
+  - superset_home:/app/superset_home
+
+x-common-build: &common-build
+  context: .
+  target: dev
+  cache_from:
+    - apache/superset-cache:3.10-slim-bookworm
+  args:
+    DEV_MODE: "true"
+
+services:
+  nginx:
+    image: nginx:latest
+    container_name: superset_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ../docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+  redis:
+    image: redis:7
+    container_name: superset_cache
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6380:6379"
+    volumes:
+      - redis:/data
+
+  # db:
+  #   env_file:
+  #     - .env
+  #   image: postgres:15
+  #   container_name: superset_db
+  #   restart: unless-stopped
+  #   ports:
+  #     - "127.0.0.1:5435:5432"
+  #   volumes:
+  #     - db_home:/var/lib/postgresql/data
+  #     - ../docker/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+
+  superset:
+    env_file: .env
+    image: *superset-image
+    container_name: superset_app
+    command: ["/app/docker/docker-bootstrap.sh", "app"]
+    restart: unless-stopped
+    ports:
+      - 8088:8088
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    user: *superset-user
+    depends_on: *superset-depends-on
+    volumes: *superset-volumes
+    environment:
+      CYPRESS_CONFIG: "${CYPRESS_CONFIG}"
+
+  # MCP service: lets AI clients (Claude Desktop/Code, ChatGPT, ...) talk to
+  # Superset (list datasets, run SQL, create charts/dashboards). Client config:
+  #   { "mcpServers": { "superset": { "type": "url", "url": "http://localhost:5008/mcp" } } }
+  # Auth: dev mode via MCP_DEV_USERNAME in docker/pythonpath_dev/superset_config.py.
+  superset-mcp:
+    env_file: .env
+    image: *superset-image
+    container_name: superset_mcp
+    command:
+      [
+        "bash",
+        "-c",
+        "pip install -r /app/docker/requirements-local.txt 2>/dev/null; superset mcp run --host 0.0.0.0 --port 5008",
+      ]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5008:5008"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    user: *superset-user
+    depends_on: *superset-depends-on
+    volumes: *superset-volumes
+
+  superset-websocket:
+    container_name: superset_websocket
+    build: ../superset-websocket
+    image: superset-websocket
+    ports:
+      - 8080:8080
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - redis
+    # Mount everything in superset-websocket into container and
+    # then exclude node_modules and dist with bogus volume mount.
+    # This is necessary because host and container need to have
+    # their own, separate versions of these files. .dockerignore
+    # does not seem to work when starting the service through
+    # docker compose.
+    #
+    # For example, node_modules may contain libs with native bindings.
+    # Those bindings need to be compiled for each OS and the container
+    # OS is not necessarily the same as host OS.
+    volumes:
+      - ../superset-websocket:/home/superset-websocket
+      - /home/superset-websocket/node_modules
+      - /home/superset-websocket/dist
+    environment:
+      - PORT=8080
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_SSL=false
+
+  superset-init:
+    image: *superset-image
+    container_name: superset_init
+    command: ["/app/docker/docker-init.sh"]
+    env_file:
+      - path: .env # default
+        required: true
+    depends_on: *superset-depends-on
+    user: *superset-user
+    volumes: *superset-volumes
+    environment:
+      CYPRESS_CONFIG: "${CYPRESS_CONFIG}"
+    healthcheck:
+      disable: true
+
+  superset-worker:
+    image: *superset-image
+    container_name: superset_worker
+    command: ["/app/docker/docker-bootstrap.sh", "worker"]
+    env_file:
+      - path: .env # default
+        required: true
+    environment:
+      CELERYD_CONCURRENCY: 2
+    restart: unless-stopped
+    depends_on: *superset-depends-on
+    user: *superset-user
+    volumes: *superset-volumes
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "celery -A superset.tasks.celery_app:app inspect ping -d celery@$$HOSTNAME",
+        ]
+    # Bump memory limit if processing selenium / thumbnails on superset-worker
+    # mem_limit: 2038m
+    # mem_reservation: 128M
+
+  superset-worker-beat:
+    image: *superset-image
+    container_name: superset_worker_beat
+    command: ["/app/docker/docker-bootstrap.sh", "beat"]
+    env_file:
+      - path: .env # default
+        required: true
+    restart: unless-stopped
+    depends_on: *superset-depends-on
+    user: *superset-user
+    volumes: *superset-volumes
+    healthcheck:
+      disable: true
+
+volumes:
+  superset_home:
+    external: false
+  db_home:
+    external: false
+  redis:
+    external: false
