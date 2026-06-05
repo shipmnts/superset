@@ -157,6 +157,7 @@
     "ag-grid-community": "35.0.1",
     "ag-grid-react": "35.0.1",
     "antd": "^5.26.0",
+    "axios": "^1.7.8",
     "chrono-node": "^2.9.0",
     "classnames": "^2.2.5",
     "content-disposition": "^1.0.1",
@@ -185,6 +186,7 @@
     "lodash": "^4.17.23",
     "mapbox-gl": "^3.19.0",
     "markdown-to-jsx": "^9.7.6",
+    "marked": "^15.0.3",
     "match-sorter": "^6.3.4",
     "memoize-one": "^5.2.1",
     "mousetrap": "^1.6.5",
@@ -223,6 +225,7 @@
     "redux-undo": "^1.0.0-beta9-9-7",
     "rison": "^0.1.1",
     "scroll-into-view-if-needed": "^3.1.0",
+    "shipmnts-swimlane": "^0.1.5",
     "simple-zstd": "^1.4.2",
     "stream-browserify": "^3.0.0",
     "tinycolor2": "^1.4.2",
@@ -388,6 +391,9 @@
     "npm": "^10.8.1"
   },
   "overrides": {
+    "shipmnts-swimlane": {
+      "react": "$react"
+    },
     "core-js": "^3.38.1",
     "puppeteer": "^22.4.1",
     "remark-gfm": "^3.0.1",

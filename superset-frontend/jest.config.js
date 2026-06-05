@@ -25,6 +25,10 @@ module.exports = {
     '\\.(css|less|geojson)$': '<rootDir>/spec/__mocks__/mockExportObject.js',
     '\\.(gif|ttf|eot|png|jpg)$': '<rootDir>/spec/__mocks__/mockExportString.js',
     '\\.svg$': '<rootDir>/spec/__mocks__/svgrMock.tsx',
+    // The shipmnts-swimlane package's compiled output fails to load under
+    // jest's @superset-ui source mapping (t() unavailable at module load),
+    // so tests use a no-op stub; webpack builds use the real package.
+    '^shipmnts-swimlane$': '<rootDir>/spec/__mocks__/shipmntsSwimlaneMock.tsx',
     '^src/(.*)$': '<rootDir>/src/$1',
     '^spec/(.*)$': '<rootDir>/spec/$1',
     // mapping plugins of superset-ui to source code
