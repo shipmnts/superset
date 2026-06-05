@@ -98,3 +98,16 @@ export const customTimeRangeEncode = (customRange: CustomRangeType): string => {
   const until = `DATEADD(DATETIME("${anchorValue}"), ${untilGrainValue}, ${untilGrain})`;
   return `${since} : ${until}`;
 };
+
+const DATE_RANGE_REGEX = RegExp(
+  String.raw`^\d{4}-\d{2}-\d{2} : \d{4}-\d{2}-\d{2}$`,
+);
+export function isDateRange(timeRange: string): boolean {
+  if (!DATE_RANGE_REGEX.test(timeRange)) {
+    return false;
+  }
+  const [since, until] = timeRange.split(' : ');
+  const sinceDayjs = extendedDayjs(since, 'YYYY-MM-DD', true);
+  const untilDayjs = extendedDayjs(until, 'YYYY-MM-DD', true);
+  return sinceDayjs.isValid() && untilDayjs.isValid();
+}

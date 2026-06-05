@@ -71,7 +71,9 @@ test('DateFilter should be applied the global config time_filter from the store'
   expect(screen.getByText('Last week')).toBeInTheDocument();
 
   userEvent.click(screen.getByText('Last week'));
-  expect(screen.getByTestId(DateFilterTestKey.CommonFrame)).toBeInTheDocument();
+  // Fork behavior: the popover always opens on the Custom Calendar tab
+  // (onOpen does setFrame(CUSTOM_CALENDAR)), not the guessed Common frame.
+  expect(screen.getByTitle('Custom Calendar')).toBeInTheDocument();
 });
 
 test('Open and close popover', () => {

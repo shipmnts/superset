@@ -45,7 +45,9 @@ export const guessFrame = (timeRange: string): FrameType => {
   if (customTimeRangeDecode(timeRange).matchedFlag) {
     return 'Custom';
   }
-  return 'Advanced';
+  // Named Custom Calendar tokens (e.g. 'Month-to-Date', 'Today') and concrete
+  // 'YYYY-MM-DD : YYYY-MM-DD' ranges resolve to the Custom Calendar frame.
+  return 'Custom Calendar';
 };
 
 export function useDefaultTimeFilter() {

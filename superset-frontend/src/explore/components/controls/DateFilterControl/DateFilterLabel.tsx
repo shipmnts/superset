@@ -48,6 +48,10 @@ import {
   FRAME_OPTIONS,
   guessFrame,
   useDefaultTimeFilter,
+  CUSTOM_CALENDAR,
+  CUSTOM_CALENDAR_RANGE_OPTIONS,
+  CUSTOM_CALENDAR_RANGE_VALUES_SET,
+  isDateRange,
 } from './utils';
 import {
   CommonFrame,
@@ -55,6 +59,7 @@ import {
   CustomFrame,
   AdvancedFrame,
   DateLabel,
+  CustomCalendarFrame,
 } from './components';
 import { CurrentCalendarFrame } from './components/CurrentCalendarFrame';
 
@@ -198,6 +203,36 @@ export default function DateFilterLabel(props: DateFilterControlProps) {
           setTooltipTitle(
             getTooltipTitle(labelIsTruncated, value, actualRange),
           );
+        } else if (guessedFrame === 'Custom Calendar') {
+          if (isDateRange(value)) {
+            setActualTimeRange(value);
+            setTooltipTitle(
+              getTooltipTitle(labelIsTruncated, actualRange, value),
+            );
+          } else {
+            const customValueKey = CUSTOM_CALENDAR_RANGE_VALUES_SET.has(value)
+              ? value
+              : undefined;
+            if (customValueKey) {
+              const presetValue = CUSTOM_CALENDAR_RANGE_OPTIONS[customValueKey];
+              const presetValueString = `${presetValue[0].format(
+                'YYYY-MM-DD',
+              )} : ${presetValue[1].format('YYYY-MM-DD')}`;
+
+              setActualTimeRange(customValueKey);
+              fetchTimeRange(presetValueString).then(
+                ({ value: fetchedValue }) => {
+                  setTooltipTitle(
+                    getTooltipTitle(
+                      labelIsTruncated,
+                      customValueKey,
+                      fetchedValue,
+                    ),
+                  );
+                },
+              );
+            }
+          }
         } else {
           setActualTimeRange(actualRange || '');
           setTooltipTitle(
@@ -207,7 +242,18 @@ export default function DateFilterLabel(props: DateFilterControlProps) {
         setValidTimeRange(true);
       }
       setLastFetchedTimeRange(value);
-      setEvalResponse(actualRange || value);
+      if (
+        guessedFrame === 'Custom Calendar' &&
+        CUSTOM_CALENDAR_RANGE_VALUES_SET.has(value)
+      ) {
+        const presetValue = CUSTOM_CALENDAR_RANGE_OPTIONS[value];
+        const presetValueRange = `${presetValue[0].format(
+          'YYYY-MM-DD',
+        )} ≤ col < ${presetValue[1].format('YYYY-MM-DD')}`;
+        setEvalResponse(presetValueRange);
+      } else {
+        setEvalResponse(actualRange || value);
+      }
     });
   }, [guessedFrame, labelIsTruncated, labelRef, value]);
 
@@ -224,6 +270,13 @@ export default function DateFilterLabel(props: DateFilterControlProps) {
           if (error) {
             setEvalResponse(error || '');
             setValidTimeRange(false);
+          } else if (CUSTOM_CALENDAR_RANGE_VALUES_SET.has(timeRangeValue)) {
+            const presetValue = CUSTOM_CALENDAR_RANGE_OPTIONS[timeRangeValue];
+            const presetValueRange = `${presetValue[0].format(
+              'YYYY-MM-DD',
+            )} ≤ col < ${presetValue[1].format('YYYY-MM-DD')}`;
+            setEvalResponse(presetValueRange);
+            setValidTimeRange(true);
           } else {
             setEvalResponse(actualRange || '');
             setValidTimeRange(true);
@@ -244,7 +297,9 @@ export default function DateFilterLabel(props: DateFilterControlProps) {
 
   function onOpen() {
     setTimeRangeValue(value);
-    setFrame(guessedFrame);
+    // Fork behavior: opening any time-range popover lands on the Custom
+    // Calendar tab by design (NOT the guessed frame).
+    setFrame(CUSTOM_CALENDAR);
     setShow(true);
     onOpenPopover();
   }
@@ -301,6 +356,12 @@ export default function DateFilterLabel(props: DateFilterControlProps) {
           value={timeRangeValue}
           onChange={setTimeRangeValue}
           isOverflowingFilterBar={isOverflowingFilterBar}
+        />
+      )}
+      {frame === 'Custom Calendar' && (
+        <CustomCalendarFrame
+          value={timeRangeValue}
+          onChange={setTimeRangeValue}
         />
       )}
       {frame === 'No filter' && <div data-test={DateFilterTestKey.NoFilter} />}

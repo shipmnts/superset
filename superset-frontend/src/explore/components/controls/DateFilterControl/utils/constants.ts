@@ -31,11 +31,25 @@ import {
   CurrentYear,
   CurrentQuarter,
   CurrentDay,
+  FrameType,
 } from 'src/explore/components/controls/DateFilterControl/types';
 import { CheckboxOptionType } from '@superset-ui/core/components/Radio';
 import { extendedDayjs } from '@superset-ui/core/utils/dates';
+import dayjs, { Dayjs } from 'dayjs';
+import quarterOfYear from 'dayjs/plugin/quarterOfYear';
+import weekOfYear from 'dayjs/plugin/weekOfYear';
+
+// The Custom Calendar presets need quarter/week granularity, which are not
+// among the plugins loaded by `@superset-ui/core/utils/dates`.
+dayjs.extend(quarterOfYear);
+dayjs.extend(weekOfYear);
+
+// `CUSTOM_CALENDAR` was a fork addition to `@superset-ui/core` in the 4.x fork;
+// it does not exist in 6.1.0 core, so it is defined locally here.
+export const CUSTOM_CALENDAR: FrameType = 'Custom Calendar';
 
 export const FRAME_OPTIONS: SelectOptionType[] = [
+  { value: 'Custom Calendar', label: t('Custom Calendar') },
   { value: 'Common', label: t('Last') },
   { value: 'Calendar', label: t('Previous') },
   { value: 'Current', label: t('Current') },
@@ -153,3 +167,77 @@ export enum DateFilterTestKey {
   CancelButton = 'cancel-button',
   ApplyButton = 'date-filter-control__apply-button',
 }
+
+// REFERENCE: https://github.com/apache/superset/issues/26651
+// Week starts on Monday (ISO).
+dayjs.updateLocale('en', { weekStart: 1 });
+
+// GOTCHA (faithful, not a regression): this object literal evaluates
+// `extendedDayjs()` "now" anchors ONCE at import (eager). The 4.x fork's
+// constants.ts is also eager. Stale-after-midnight preview is a pre-existing
+// quirk; a lazy-factory fix is deliberately deferred.
+export const CUSTOM_CALENDAR_RANGE_OPTIONS: Record<string, [Dayjs, Dayjs]> = {
+  [t('Today')]: [extendedDayjs(), extendedDayjs().add(1, 'days')],
+  [t('Current Week')]: [
+    extendedDayjs().startOf('week'),
+    extendedDayjs().endOf('week').add(1, 'days'),
+  ],
+  [t('Current Month')]: [
+    extendedDayjs().startOf('month'),
+    extendedDayjs().endOf('month').add(1, 'days'),
+  ],
+  [t('Current Quarter')]: [
+    extendedDayjs().startOf('quarter'),
+    extendedDayjs().endOf('quarter').add(1, 'days'),
+  ],
+  [t('Current Year')]: [
+    extendedDayjs().startOf('year'),
+    extendedDayjs().endOf('year').add(1, 'days'),
+  ],
+  [t('Week-to-Date')]: [extendedDayjs().startOf('week'), extendedDayjs()],
+  [t('Month-to-Date')]: [extendedDayjs().startOf('month'), extendedDayjs()],
+  [t('Quarter-to-Date')]: [extendedDayjs().startOf('quarter'), extendedDayjs()],
+  [t('Year-to-Date')]: [extendedDayjs().startOf('year'), extendedDayjs()],
+  [t('Yesterday')]: [
+    extendedDayjs().subtract(1, 'days'),
+    extendedDayjs().subtract(1, 'days').add(1, 'days'),
+  ],
+  [t('Previous Week')]: [
+    extendedDayjs().subtract(1, 'weeks').startOf('week'),
+    extendedDayjs().subtract(1, 'weeks').endOf('week').add(1, 'days'),
+  ],
+  [t('Previous Month')]: [
+    extendedDayjs().subtract(1, 'months').startOf('month'),
+    extendedDayjs().subtract(1, 'months').endOf('month').add(1, 'days'),
+  ],
+  [t('Previous Quarter')]: [
+    extendedDayjs().subtract(1, 'quarters').startOf('quarter'),
+    extendedDayjs().subtract(1, 'quarters').endOf('quarter').add(1, 'days'),
+  ],
+  [t('Previous Year')]: [
+    extendedDayjs().subtract(1, 'years').startOf('year'),
+    extendedDayjs().subtract(1, 'years').endOf('year').add(1, 'days'),
+  ],
+  // The `Last *` tokens are dead in the backend (shadowed by the upstream
+  // `Last` handler) — kept faithful to the fork.
+  [t('Last Week')]: [
+    extendedDayjs().subtract(7, 'days'),
+    extendedDayjs().subtract(1, 'days').add(1, 'days'),
+  ],
+  [t('Last Month')]: [
+    extendedDayjs().subtract(1, 'months'),
+    extendedDayjs().subtract(1, 'days').add(1, 'days'),
+  ],
+  [t('Last Quarter')]: [
+    extendedDayjs().subtract(3, 'months'),
+    extendedDayjs().subtract(1, 'days').add(1, 'days'),
+  ],
+  [t('Last Year')]: [
+    extendedDayjs().subtract(1, 'years'),
+    extendedDayjs().subtract(1, 'days').add(1, 'days'),
+  ],
+};
+
+export const CUSTOM_CALENDAR_RANGE_VALUES_SET = new Set(
+  Object.keys(CUSTOM_CALENDAR_RANGE_OPTIONS),
+);
