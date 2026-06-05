@@ -113,6 +113,9 @@ export default function transformProps(
     showXAxisMinMaxLabels = false,
     showYAxis = false,
     showYAxisMinMaxLabels = false,
+    // ChartProps camelCases formData keys, so the `rolling_type` control
+    // surfaces here as `rollingType`.
+    rollingType,
   } = formData;
   const granularity = extractTimegrain(rawFormData);
   const {
@@ -204,10 +207,22 @@ export default function transformProps(
       const compareToValue = sortedData[0][1];
       // compare values must both be non-nulls
       if (compareToValue !== null && compareFromValue !== null) {
-        percentChange = compareFromValue
-          ? (Number(compareToValue) - compareFromValue) /
-            Math.abs(compareFromValue)
-          : 0;
+        if (rollingType === 'cumsum') {
+          // For a cumulative-sum series, the raw values are running totals, so
+          // the per-period values are the deltas between consecutive points.
+          const currentValue =
+            Number(compareToValue) - (sortedData[1]?.[1] ?? 0);
+          const prevValue =
+            compareFromValue - (sortedData[compareIndex + 1]?.[1] ?? 0);
+          percentChange = prevValue
+            ? (currentValue - prevValue) / Math.abs(prevValue)
+            : 0;
+        } else {
+          percentChange = compareFromValue
+            ? (Number(compareToValue) - compareFromValue) /
+              Math.abs(compareFromValue)
+            : 0;
+        }
         formattedSubheader = `${formatPercentChange(
           percentChange,
         )} ${compareSuffix}`;
