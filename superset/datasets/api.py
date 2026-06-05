@@ -440,7 +440,9 @@ class DatasetRestApi(BaseSupersetModelRestApi):
         except ValidationError as error:
             return self.response_400(message=error.messages)
         try:
-            changed_model = UpdateDatasetCommand(pk, item, override_columns).run()
+            # Fork behavior: always override columns; the UI sends the full
+            # column list. The query arg still gates RefreshDatasetCommand below.
+            changed_model = UpdateDatasetCommand(pk, item, True).run()
             if override_columns:
                 RefreshDatasetCommand(pk).run()
             response = self.response(200, id=changed_model.id, result=item)

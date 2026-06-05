@@ -91,6 +91,9 @@ class DatasetColumnsPutSchema(Schema):
         allow_none=True, validate=[Length(1, 100), validate_python_date_format]
     )
     uuid = fields.UUID(allow_none=True)
+    # Accepted from the UI payload for schema validation only; the effective
+    # override flag is dataset-level (see DatasetRestApi.put / patch 14).
+    override_columns = fields.Boolean(required=False, load_default=False)
 
 
 class DatasetMetricCurrencyPutSchema(Schema):
