@@ -16,8 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-// eslint-disable-next-line import/prefer-default-export
 export { default as PivotTableChartPlugin } from './plugin';
+export { MetricsLayoutEnum } from './types';
 /**
  * Note: this file exports the default export from PivotTableChart.tsx.
  * If you want to export multiple visualization modules, you will need to

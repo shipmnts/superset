@@ -41,6 +41,8 @@ import {
   isFeatureEnabled,
   FeatureFlag,
   VizType,
+  AdhocMetric,
+  getColumnLabel,
 } from '@superset-ui/core';
 import {
   styled,
@@ -71,6 +73,7 @@ import Tabs from '@superset-ui/core/components/Tabs';
 import { PluginContext } from 'src/components';
 import { useConfirmModal } from 'src/hooks/useConfirmModal';
 
+import { MetricsLayoutEnum } from '@superset-ui/plugin-chart-pivot-table';
 import { getSectionsToRender } from 'src/explore/controlUtils';
 import { ExploreActions } from 'src/explore/actions/exploreActions';
 import { ChartState, ExplorePageState } from 'src/explore/types';
@@ -203,6 +206,15 @@ const Styles = styled.div`
   }
 `;
 
+const METRIC_KEY = t('Metric');
+
+const flatKey = (attrVals: string[]) => attrVals.join(String.fromCharCode(0));
+
+const uniqItems = (items: string[][]) =>
+  Array.from(new Set(items.map(item => JSON.stringify(item)))).map(item =>
+    JSON.parse(item),
+  );
+
 const isTimeSection = (section: ControlPanelSectionConfig): boolean =>
   !!section.label && sections.legacyTimeseriesTime.label === section.label;
 
@@ -285,6 +297,20 @@ function getState(
   };
 }
 
+const getChoices = (
+  config: { choices?: [JsonValue, ReactNode][] },
+  colKeys: string[][],
+): [string, string][] => {
+  const choices: [string, string][] = (config.choices || [])
+    .slice(0, 4)
+    .map(choice => [String(choice[0]), String(choice[1])]);
+  colKeys.forEach((colKey: string[]) => {
+    choices.push([`${colKey.join('___')}_asc`, `${colKey.join('_')} asc`]);
+    choices.push([`${colKey.join('___')}_desc`, `${colKey.join('_')} desc`]);
+  });
+  return choices;
+};
+
 function useResetOnChangeRef(initialValue: () => any, resetOnChangeValue: any) {
   const value = useRef(initialValue());
   const prevResetOnChangeValue = useRef(resetOnChangeValue);
@@ -319,9 +345,11 @@ export const ControlPanelsContainer = (props: ControlPanelsContainerProps) => {
     state => state.common?.conf?.DEFAULT_TIME_FILTER || NO_TIME_RANGE,
   );
 
-  const { form_data, actions } = props;
+  const { form_data, actions, chart } = props;
   const { setControlValue } = actions;
   const { x_axis, adhoc_filters } = form_data;
+  const queriesResponse = chart.queriesResponse as any[];
+  const data = queriesResponse?.[0]?.data;
 
   const previousXAxis = usePrevious(x_axis);
 
@@ -431,6 +459,111 @@ export const ControlPanelsContainer = (props: ControlPanelsContainerProps) => {
     prevDatasource,
   ]);
 
+  const metricNames = useMemo(
+    () =>
+      form_data.metrics?.map((metric: string | AdhocMetric) =>
+        typeof metric === 'string' ? metric : (metric.label as string),
+      ) || [],
+    [form_data.metrics],
+  );
+
+  const unpivotedData: Record<string, any>[] | undefined = useMemo(() => {
+    if (!Array.isArray(data)) {
+      return [];
+    }
+    return data.reduce(
+      (acc: Record<string, any>[], record: Record<string, any>) => [
+        ...acc,
+        ...metricNames
+          .map((name: string) => ({
+            ...record,
+            [METRIC_KEY]: name,
+            value: record[name],
+          }))
+          .filter((rec: Record<string, any>) => rec.value !== null),
+      ],
+      [],
+    );
+  }, [data, metricNames]);
+
+  const groupbyRows = useMemo(
+    () => form_data.groupbyRows?.map(getColumnLabel) || [],
+    [form_data.groupbyRows],
+  );
+  const groupbyColumns = useMemo(
+    () => form_data.groupbyColumns?.map(getColumnLabel) || [],
+    [form_data.groupbyColumns],
+  );
+
+  const [rows, cols] = useMemo(() => {
+    let [rows_, cols_] = form_data.transposePivot
+      ? [groupbyColumns, groupbyRows]
+      : [groupbyRows, groupbyColumns];
+
+    if (form_data.metricsLayout === MetricsLayoutEnum.ROWS) {
+      rows_ = form_data.combineMetric
+        ? [...rows_, METRIC_KEY]
+        : [METRIC_KEY, ...rows_];
+    } else {
+      cols_ = form_data.combineMetric
+        ? [...cols_, METRIC_KEY]
+        : [METRIC_KEY, ...cols_];
+    }
+    return [rows_, cols_];
+  }, [
+    form_data.combineMetric,
+    groupbyColumns,
+    groupbyRows,
+    form_data.metricsLayout,
+    form_data.transposePivot,
+  ]);
+
+  const [rowKeys, colKeys] = useMemo(() => {
+    const rowKeys: string[][] = [];
+    const colKeys: string[][] = [];
+    unpivotedData?.forEach((record: Record<string, any>) => {
+      const rowTotals: Record<string, number> = {};
+      const colTotals: Record<string, number> = {};
+      const rowKey: string[] = [];
+      const colKey: string[] = [];
+      const rowStart = form_data.rowSubTotals ? 1 : Math.max(1, rowKey.length);
+      const colStart = form_data.colSubTotals ? 1 : Math.max(1, colKey.length);
+
+      rows.forEach((row: string) => {
+        rowKey.push(row in record ? record[row] : 'null');
+      });
+      cols.forEach((col: string) => {
+        colKey.push(col in record ? record[col] : 'null');
+      });
+
+      for (let ri = rowStart; ri <= rowKey.length; ri += 1) {
+        const fRowKey = rowKey.slice(0, ri);
+        const flatRowKey = flatKey(fRowKey);
+        if (!rowTotals[flatRowKey]) {
+          rowKeys.push(fRowKey);
+          rowTotals[flatRowKey] = 1;
+        }
+      }
+
+      for (let ci = colStart; ci <= colKey.length; ci += 1) {
+        const fColKey = colKey.slice(0, ci);
+        const flatColKey = flatKey(fColKey);
+        if (!colTotals[flatColKey]) {
+          colKeys.push(fColKey);
+          colTotals[flatColKey] = 1;
+        }
+      }
+    });
+
+    return [uniqItems(rowKeys), uniqItems(colKeys)];
+  }, [
+    cols,
+    form_data.colSubTotals,
+    form_data.rowSubTotals,
+    rows,
+    unpivotedData,
+  ]);
+
   const {
     expandedQuerySections,
     expandedCustomizeSections,
@@ -508,6 +641,10 @@ export const ControlPanelsContainer = (props: ControlPanelsContainerProps) => {
     } = controlData as ControlState & {
       validationErrors?: any[];
     };
+    if (name === 'rowOrder' && colKeys?.length > 0)
+      restProps.choices = uniqItems(getChoices(restProps, colKeys));
+    if (name === 'colOrder' && rowKeys?.length > 0)
+      restProps.choices = uniqItems(getChoices(restProps, rowKeys));
 
     const isVisible = visibility
       ? visibility.call(config, props, controlData)

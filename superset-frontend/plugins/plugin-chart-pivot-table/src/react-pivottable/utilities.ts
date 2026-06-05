@@ -52,7 +52,10 @@ interface SubtotalOptions {
   colEnabled?: boolean;
   rowPartialOnTop?: boolean;
   colPartialOnTop?: boolean;
+  expandCollapse?: boolean;
 }
+
+const METRIC_KEY = t('Metric');
 
 const addSeparators = function (
   nStr: string,
@@ -166,6 +169,8 @@ const naturalSort: SortFunction = (as, bs) => {
   }
   return aArr.length - bArr.length;
 };
+
+const cleanSortKey = (str: string): string => str.replace(/_(desc|asc)$/, '');
 
 const sortAs = function (order: (string | number)[]): SortFunction {
   const mapping: Record<string | number, number> = {};
@@ -784,6 +789,8 @@ class PivotData {
   allTotal: Aggregator;
   subtotals: SubtotalOptions;
   sorted: boolean;
+  metricTotals: Record<string, Record<string, Aggregator>>;
+  metrics: Record<string, number>;
 
   static forEachRecord: (
     input: unknown,
@@ -845,6 +852,8 @@ class PivotData {
     this.allTotal = this.aggregator(this, [], []);
     this.subtotals = subtotals;
     this.sorted = false;
+    this.metricTotals = {};
+    this.metrics = {};
 
     // iterate through input, accumulating data for cells
     PivotData.forEachRecord(this.props.data, this.processRecord);
@@ -910,8 +919,29 @@ class PivotData {
         case 'value_z_to_a':
           this.rowKeys.sort((a, b) => -naturalSort(v(a, []), v(b, [])));
           break;
-        default:
-          this.rowKeys.sort(this.arrSort(rows, this.subtotals.rowPartialOnTop));
+        default: {
+          const rowOrder = (this.props.rowOrder as string) ?? '';
+          const sortValueKey = cleanSortKey(rowOrder);
+          if (rowOrder.endsWith('_asc'))
+            this.rowKeys.sort((a, b) =>
+              naturalSort(
+                v(a, sortValueKey.split('___')),
+                v(b, sortValueKey.split('___')),
+              ),
+            );
+          else if (rowOrder.endsWith('_desc'))
+            this.rowKeys.sort(
+              (a, b) =>
+                -naturalSort(
+                  v(a, sortValueKey.split('___')),
+                  v(b, sortValueKey.split('___')),
+                ),
+            );
+          else
+            this.rowKeys.sort(
+              this.arrSort(rows, this.subtotals.rowPartialOnTop),
+            );
+        }
       }
       switch (this.props.colOrder) {
         case 'key_z_to_a':
@@ -925,8 +955,29 @@ class PivotData {
         case 'value_z_to_a':
           this.colKeys.sort((a, b) => -naturalSort(v([], a), v([], b)));
           break;
-        default:
-          this.colKeys.sort(this.arrSort(cols, this.subtotals.colPartialOnTop));
+        default: {
+          const colOrder = (this.props.colOrder as string) ?? '';
+          const sortValueKey = cleanSortKey(colOrder);
+          if (colOrder.endsWith('_asc'))
+            this.colKeys.sort((a, b) =>
+              naturalSort(
+                v(sortValueKey.split('___'), a),
+                v(sortValueKey.split('___'), b),
+              ),
+            );
+          else if (colOrder.endsWith('_desc'))
+            this.colKeys.sort(
+              (a, b) =>
+                -naturalSort(
+                  v(sortValueKey.split('___'), a),
+                  v(sortValueKey.split('___'), b),
+                ),
+            );
+          else
+            this.colKeys.sort(
+              this.arrSort(cols, this.subtotals.colPartialOnTop),
+            );
+        }
       }
     }
   }
@@ -954,7 +1005,10 @@ class PivotData {
 
     this.allTotal.push(record);
 
-    const rowStart = this.subtotals.rowEnabled ? 1 : Math.max(1, rowKey.length);
+    const rowStart =
+      this.subtotals.expandCollapse || this.subtotals.rowEnabled
+        ? 1
+        : Math.max(1, rowKey.length);
     const colStart = this.subtotals.colEnabled ? 1 : Math.max(1, colKey.length);
 
     let isRowSubtotal;
@@ -972,6 +1026,19 @@ class PivotData {
       }
       this.rowTotals[flatRowKey].push(record);
       this.rowTotals[flatRowKey].isSubtotal = isRowSubtotal;
+
+      if (record[METRIC_KEY]) {
+        const metricName = String(record[METRIC_KEY]);
+        this.metrics[metricName] = 1;
+        if (!this.metricTotals[flatRowKey]) {
+          this.metricTotals[flatRowKey] = {};
+        }
+        if (!this.metricTotals[flatRowKey][metricName]) {
+          this.metricTotals[flatRowKey][metricName] =
+            this.getFormattedAggregator(record)(this, flatRowKey, metricName);
+        }
+        this.metricTotals[flatRowKey][metricName].push(record);
+      }
     }
 
     for (let ci = colStart; ci <= colKey.length; ci += 1) {
@@ -1040,6 +1107,14 @@ class PivotData {
       }
     );
   }
+
+  getMetricTotals(rowKey: string[]): Record<string, Aggregator> {
+    return this.metricTotals?.[flatKey(rowKey)] || {};
+  }
+
+  getMetrics(): string[] {
+    return Object.keys(this.metrics || {});
+  }
 }
 
 // can handle arrays or jQuery selections of tables
@@ -1078,18 +1153,8 @@ PivotData.propTypes = {
     PropTypes.objectOf(PropTypes.func),
   ]),
   derivedAttributes: PropTypes.objectOf(PropTypes.func),
-  rowOrder: PropTypes.oneOf([
-    'key_a_to_z',
-    'key_z_to_a',
-    'value_a_to_z',
-    'value_z_to_a',
-  ]),
-  colOrder: PropTypes.oneOf([
-    'key_a_to_z',
-    'key_z_to_a',
-    'value_a_to_z',
-    'value_z_to_a',
-  ]),
+  rowOrder: PropTypes.string,
+  colOrder: PropTypes.string,
 };
 
 export type {

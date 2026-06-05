@@ -254,6 +254,13 @@ export interface BaseControlConfig<
   default?: V;
   initialValue?: V;
   renderTrigger?: boolean;
+  /**
+   * Marks a control whose `choices` are computed dynamically at render time
+   * (e.g. value-based pivot sort keys). When set, `handleMissingChoice` will
+   * not null out a single-select value just because it is absent from the
+   * statically-declared `choices` list.
+   */
+  isDynamic?: boolean;
   validators?: ControlValueValidator<T, O, V>[];
   warning?: ReactNode;
   error?: ReactNode;

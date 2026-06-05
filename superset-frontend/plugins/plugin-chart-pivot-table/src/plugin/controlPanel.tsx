@@ -203,6 +203,18 @@ const config: ControlPanelConfig = {
         ],
         [
           {
+            name: 'expandCollapse',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Expand-collapse'),
+              default: false,
+              renderTrigger: true,
+              description: t('Expand collapse rows.'),
+            },
+          },
+        ],
+        [
+          {
             name: 'rowTotals',
             config: {
               type: 'CheckboxControl',
@@ -331,6 +343,7 @@ const config: ControlPanelConfig = {
                   </ul>
                 </>
               ),
+              isDynamic: true,
             },
           },
         ],
@@ -359,6 +372,7 @@ const config: ControlPanelConfig = {
                   </ul>
                 </>
               ),
+              isDynamic: true,
             },
           },
         ],

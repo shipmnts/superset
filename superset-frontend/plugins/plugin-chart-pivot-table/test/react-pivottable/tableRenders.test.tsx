@@ -23,6 +23,7 @@ import {
 } from '@superset-ui/chart-controls';
 import {
   getCellColor,
+  parseLabel,
   TableRenderer,
 } from '../../src/react-pivottable/TableRenderers';
 import type { PivotData } from '../../src/react-pivottable/utilities';
@@ -184,6 +185,8 @@ beforeEach(() => {
     activeSortColumn: null,
     collapsedRows: {},
     collapsedCols: {},
+    isCollapsed: false,
+    collapseLevel: 0,
   } as TableRendererStateStub;
 });
 
@@ -315,6 +318,8 @@ test('should check second call in sequence', () => {
     activeSortColumn: 0,
     collapsedRows: {},
     collapsedCols: {},
+    isCollapsed: false,
+    collapseLevel: 0,
   } as TableRendererStateStub;
   tableRenderer.sortData(columnIndex, visibleColKeys, pivotData, maxRowIndex);
 
@@ -323,6 +328,8 @@ test('should check second call in sequence', () => {
     activeSortColumn: 0,
     collapsedRows: {},
     collapsedCols: {},
+    isCollapsed: false,
+    collapseLevel: 0,
   } as TableRendererStateStub;
   tableRenderer.sortData(columnIndex, visibleColKeys, pivotData, maxRowIndex);
 
@@ -1146,3 +1153,28 @@ test.each([
     expect(formatter).toHaveBeenCalledWith(expected);
   },
 );
+
+describe('parseLabel', () => {
+  it('parses an anchor-tag string into a real anchor element', () => {
+    const result = parseLabel(
+      '<a href="https://example.com/orders/42">Order 42</a>',
+    );
+    expect(isValidElement(result)).toBe(true);
+    const element = result as ReactElement<{
+      href: string;
+      target: string;
+      rel: string;
+      children: string;
+    }>;
+    expect(element.type).toBe('a');
+    expect(element.props.href).toBe('https://example.com/orders/42');
+    expect(element.props.target).toBe('_blank');
+    expect(element.props.rel).toBe('noreferrer');
+    expect(element.props.children).toBe('Order 42');
+  });
+
+  it('returns a plain string unchanged when there is no anchor tag', () => {
+    expect(parseLabel('plain value')).toBe('plain value');
+    expect(parseLabel('metric')).toBe('metric');
+  });
+});
