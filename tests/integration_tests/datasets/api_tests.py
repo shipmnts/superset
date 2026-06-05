@@ -1432,21 +1432,23 @@ class TestDatasetApi(SupersetTestCase):
     def test_update_dataset_update_column_uniqueness(self):
         """
         Dataset API: Test update dataset columns uniqueness
+
+        Fork override semantics: the dataset PUT always forces
+        override_columns=True (UI sends the full column list), so a PUT is
+        treated as a full column replacement. The pre-existing-column
+        uniqueness validation is therefore skipped and re-submitting an
+        existing column name like "id" succeeds (200) rather than 422.
         """
 
         dataset = self.insert_default_dataset()
 
         self.login(ADMIN_USERNAME)
         uri = f"api/v1/dataset/{dataset.id}"
-        # try to insert a new column ID that already exists
+        # submitting an existing column ID is accepted because override forces
+        # a full column replacement (uniqueness validation skipped)
         data = {"columns": [{"column_name": "id", "type": "INTEGER"}]}
         rv = self.put_assert_metric(uri, data, "put")
-        assert rv.status_code == 422
-        data = json.loads(rv.data.decode("utf-8"))
-        expected_result = {
-            "message": {"columns": ["One or more columns already exist"]}
-        }
-        assert data == expected_result
+        assert rv.status_code == 200
         self.items_to_delete = [dataset]
 
     def test_update_dataset_update_metric_uniqueness(self):
