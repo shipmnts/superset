@@ -106,6 +106,28 @@ const plugins = [
     ...(isDevMode ? { Buffer: ['buffer', 'Buffer'] } : {}), // Fix legacy-plugin-chart-paired-t-test broken Story
   }),
 
+  // The precompiled `shipmnts-swimlane` package targets the 4.x `@superset-ui/core`
+  // API, where `t`/translation were exported from the core root. 6.1.0 moved them
+  // to `@apache-superset/core/translation` (PR #36929), so swimlane's module-scope
+  // `t()` crashes app init. Redirect ONLY swimlane's `@superset-ui/core` imports to
+  // a shim that restores the 4.x shape; app code keeps the real core (single copy).
+  new webpack.NormalModuleReplacementPlugin(
+    /^@superset-ui\/core$/,
+    resource => {
+      if (
+        resource.context &&
+        resource.context.includes(
+          `${path.sep}node_modules${path.sep}shipmnts-swimlane`,
+        )
+      ) {
+        resource.request = path.resolve(
+          APP_DIR,
+          'webpack.shims/shipmnts-swimlane-core-shim.ts',
+        );
+      }
+    },
+  ),
+
   // creates a manifest.json mapping of name to hashed output used in template files
   new WebpackManifestPlugin({
     publicPath: output.publicPath,
