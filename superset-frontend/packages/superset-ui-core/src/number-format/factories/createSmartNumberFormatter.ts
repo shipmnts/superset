@@ -27,6 +27,26 @@ const siFormatter = locale.format(`.3~s`);
 const float2PointFormatter = locale.format(`.2~f`);
 const float4PointFormatter = locale.format(`.4~f`);
 
+function formatIndianNumber(value: number): string {
+  if (value === 0) return '0';
+
+  const absValue = Math.abs(value);
+  const sign = value < 0 ? '-' : '';
+
+  const format = (num: number) =>
+    Number.isInteger(num)
+      ? num.toString()
+      : parseFloat(num.toFixed(2)).toString();
+
+  if (absValue < 0.000001) return `${sign}${absValue.toExponential(2)}`;
+
+  if (absValue < 0.001) return `${sign}${format(absValue * 1_000_000)}µ`;
+  if (absValue < 1_000) return `${sign}${format(absValue)}`;
+  if (absValue < 1_00_000) return `${sign}${format(absValue / 1_000)}K`;
+  if (absValue < 1_00_00_000) return `${sign}${format(absValue / 1_00_000)}L`;
+  return `${sign}${format(absValue / 1_00_00_000)}Cr`;
+}
+
 function formatValue(value: number) {
   if (value === 0) {
     return '0';
@@ -59,10 +79,16 @@ export default function createSmartNumberFormatter(
 ) {
   const { description, signed = false, id, label } = config;
   const getSign = signed ? (value: number) => (value > 0 ? '+' : '') : () => '';
+  const urlParams = new URLSearchParams(window.location.search);
+  const existingParams = Object.fromEntries(urlParams.entries());
+  const isIndiaCountryTenant = existingParams?.tenant_country === 'IN';
 
   return new NumberFormatter({
     description,
-    formatFunc: value => `${getSign(value)}${formatValue(value)}`,
+    formatFunc: value =>
+      `${getSign(value)}${
+        isIndiaCountryTenant ? formatIndianNumber(value) : formatValue(value)
+      }`,
     id:
       id || signed
         ? NumberFormats.SMART_NUMBER_SIGNED
