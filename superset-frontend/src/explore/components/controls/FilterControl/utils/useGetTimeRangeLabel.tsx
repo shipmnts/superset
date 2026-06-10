@@ -17,8 +17,7 @@
  * under the License.
  */
 import { useEffect, useState } from 'react';
-import { NO_TIME_RANGE } from '@superset-ui/core';
-import { fetchTimeRange } from 'src/explore/components/controls/DateFilterControl';
+import { NO_TIME_RANGE, fetchTimeRange } from '@superset-ui/core';
 import { Operators } from 'src/explore/constants';
 import AdhocFilter from '../AdhocFilter';
 import { ExpressionTypes } from '../types';
@@ -54,21 +53,22 @@ export const useGetTimeRangeLabel = (adhocFilter: AdhocFilter): Results => {
       adhocFilter.comparator !== NO_TIME_RANGE &&
       actualTimeRange.title !== adhocFilter.comparator
     ) {
-      fetchTimeRange(adhocFilter.comparator, adhocFilter.subject).then(
-        ({ value, error }) => {
-          if (error) {
-            setActualTimeRange({
-              actualTimeRange: `${adhocFilter.subject} (${adhocFilter.comparator})`,
-              title: error,
-            });
-          } else {
-            setActualTimeRange({
-              actualTimeRange: value ?? '',
-              title: adhocFilter.comparator,
-            });
-          }
-        },
-      );
+      fetchTimeRange(
+        adhocFilter.comparator as string,
+        adhocFilter.subject as string,
+      ).then(({ value, error }) => {
+        if (error) {
+          setActualTimeRange({
+            actualTimeRange: `${adhocFilter.subject} (${adhocFilter.comparator})`,
+            title: error,
+          });
+        } else {
+          setActualTimeRange({
+            actualTimeRange: value ?? '',
+            title: adhocFilter.comparator as string | undefined,
+          });
+        }
+      });
     }
   }, [adhocFilter]);
 

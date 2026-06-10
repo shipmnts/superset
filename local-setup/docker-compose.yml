@@ -16,20 +16,20 @@
 #
 x-superset-image: &superset-image apachesuperset.docker.scarf.sh/apache/superset:${TAG:-latest-dev}
 x-superset-user: &superset-user root
-x-superset-depends-on:
-  &superset-depends-on
-  - db
+x-superset-depends-on: &superset-depends-on
   - redis
 x-superset-volumes:
   # /app/pythonpath_docker will be appended to the PYTHONPATH in the final container
   &superset-volumes
   - ../docker:/app/docker
+  # ../superset re-enabled in Phase 6 so custom backend code is live. The repo's
+  # superset/static/assets must contain built frontend assets (copied from the
+  # image in Phase 6; replaced by our own npm build in Phase 7) or :8088 has no UI.
   - ../superset:/app/superset
-  - ../superset-frontend:/app/superset-frontend
+  # - ../superset-frontend:/app/superset-frontend
   - superset_home:/app/superset_home
 
-x-common-build:
-  &common-build
+x-common-build: &common-build
   context: .
   target: dev
   cache_from:
@@ -57,24 +57,23 @@ services:
     volumes:
       - redis:/data
 
-  db:
-    env_file:
-      - path: .env # default
-        required: true
-    image: postgres:15
-    container_name: superset_db
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:5433:5432"
-    volumes:
-      - db_home:/var/lib/postgresql/data
-      - ../docker/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+  # db:
+  #   env_file:
+  #     - .env
+  #   image: postgres:15
+  #   container_name: superset_db
+  #   restart: unless-stopped
+  #   ports:
+  #     - "127.0.0.1:5435:5432"
+  #   volumes:
+  #     - db_home:/var/lib/postgresql/data
+  #     - ../docker/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
 
   superset:
     env_file: .env
     image: *superset-image
     container_name: superset_app
-    command: [ "/app/docker/docker-bootstrap.sh", "app" ]
+    command: ["/app/docker/docker-bootstrap.sh", "app"]
     restart: unless-stopped
     ports:
       - 8088:8088
@@ -85,6 +84,29 @@ services:
     volumes: *superset-volumes
     environment:
       CYPRESS_CONFIG: "${CYPRESS_CONFIG}"
+
+  # MCP service: lets AI clients (Claude Desktop/Code, ChatGPT, ...) talk to
+  # Superset (list datasets, run SQL, create charts/dashboards). Client config:
+  #   { "mcpServers": { "superset": { "type": "url", "url": "http://localhost:5008/mcp" } } }
+  # Auth: dev mode via MCP_DEV_USERNAME in docker/pythonpath_dev/superset_config.py.
+  superset-mcp:
+    env_file: .env
+    image: *superset-image
+    container_name: superset_mcp
+    command:
+      [
+        "bash",
+        "-c",
+        "pip install -r /app/docker/requirements-local.txt 2>/dev/null; superset mcp run --host 0.0.0.0 --port 5008",
+      ]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5008:5008"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    user: *superset-user
+    depends_on: *superset-depends-on
+    volumes: *superset-volumes
 
   superset-websocket:
     container_name: superset_websocket
@@ -119,7 +141,7 @@ services:
   superset-init:
     image: *superset-image
     container_name: superset_init
-    command: [ "/app/docker/docker-init.sh" ]
+    command: ["/app/docker/docker-init.sh"]
     env_file:
       - path: .env # default
         required: true
@@ -134,7 +156,7 @@ services:
   superset-worker:
     image: *superset-image
     container_name: superset_worker
-    command: [ "/app/docker/docker-bootstrap.sh", "worker" ]
+    command: ["/app/docker/docker-bootstrap.sh", "worker"]
     env_file:
       - path: .env # default
         required: true
@@ -150,7 +172,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "celery -A superset.tasks.celery_app:app inspect ping -d celery@$$HOSTNAME"
+          "celery -A superset.tasks.celery_app:app inspect ping -d celery@$$HOSTNAME",
         ]
     # Bump memory limit if processing selenium / thumbnails on superset-worker
     # mem_limit: 2038m
@@ -159,7 +181,7 @@ services:
   superset-worker-beat:
     image: *superset-image
     container_name: superset_worker_beat
-    command: [ "/app/docker/docker-bootstrap.sh", "beat" ]
+    command: ["/app/docker/docker-bootstrap.sh", "beat"]
     env_file:
       - path: .env # default
         required: true

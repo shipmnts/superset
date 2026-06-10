@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { ReactNode } from 'react';
+import React, { ReactNode } from 'react';
 import {
   DatasourceType,
   ensureIsArray,
@@ -126,7 +126,8 @@ export function applyMapStateToPropsToControl<T = ControlType>(
     }
   }
   // If no current value, set it as default
-  if (state.default && value === undefined) {
+  // Use loose equality to catch both null and undefined
+  if (state.default != null && value == null) {
     value = state.default;
   }
   // If a choice control went from multi=false to true, wrap value in array
@@ -174,8 +175,9 @@ export function getAllControlsState(
   state: ControlPanelState | null,
   formData: QueryFormData,
 ) {
-  const controlsState = {};
-  getSectionsToRender(vizType, datasourceType).forEach(section =>
+  const controlsState: Record<string, ControlState<any> | null> = {};
+  getSectionsToRender(vizType, datasourceType).forEach(section => {
+    if (!section || !section.controlSetRows) return;
     section.controlSetRows.forEach(fieldsetRow =>
       fieldsetRow.forEach((field: CustomControlItem) => {
         if (field?.config && field.name) {
@@ -185,9 +187,17 @@ export function getAllControlsState(
             state,
             formData[name],
           );
+        } else if (React.isValidElement(field)) {
+          const props = field.props as { name: string; [key: string]: any };
+          const { name, ...configProps } = props;
+          controlsState[name] = getControlStateFromControlConfig(
+            configProps as ControlConfig<any>,
+            state,
+            formData[name],
+          );
         }
       }),
-    ),
-  );
+    );
+  });
   return controlsState;
 }

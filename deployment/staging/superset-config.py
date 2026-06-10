@@ -47,13 +47,18 @@ FEATURE_FLAGS = {
     "EMBEDDED_SUPERSET": True,
     "ENABLE_TEMPLATE_PROCESSING": True,
     "DRILL_TO_DETAIL": True,
-    "ADHOC_DASHBOARD_NATIVE_FILTERS": True,
+    # ADHOC_DASHBOARD_NATIVE_FILTERS removed: flag no longer exists in 6.x
+    # (adhoc dashboard native filters are standard behavior).
     "CHART_PLUGINS_EXPERIMENTAL": True,
     "DASHBOARD_VIRTUALIZATION": False
 }
 
 ALERT_REPORTS_NOTIFICATION_DRY_RUN = True
 SQLLAB_CTAS_NO_LIMIT = True
+
+# Fork override (was a core patch on 4.0.2; config-only since 6.1.0 upgrade):
+# large dashboards exceed the default position-data size limit.
+SUPERSET_DASHBOARD_POSITION_DATA_LIMIT = 85535
 # ------------------ Embedded Configurations --------------------
 
 BASE_URL = os.getenv('SUPERSET_URL')
@@ -66,7 +71,7 @@ ENABLE_PROXY_FIX = True
 TALISMAN_ENABLED = False # since we our using embedded sdk, so we dont this option to embedded dashboard access.
 OVERRIDE_HTTP_HEADERS = { "Content-Security-Policy": f"frame-ancestors {FRONTEND_URL} {MOBILE_DASHBOARD_URL} " } 
 GUEST_TOKEN_JWT_EXP_SECONDS = 1800
-GUEST_ROLE_NAME = "Shipmnts"
+GUEST_ROLE_NAME = "Gamma"
 WTF_CSRF_ENABLED = True
 WTF_CSRF_TIME_LIMIT = 60 * 60 * 24 * 7
 ENABLE_CORS = True

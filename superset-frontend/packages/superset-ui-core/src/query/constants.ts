@@ -26,7 +26,6 @@ import {
 
 export const DTTM_ALIAS = '__timestamp';
 export const NO_TIME_RANGE = 'No filter';
-export const CUSTOM_CALENDAR = 'Custom Calendar'
 
 export const EXTRA_FORM_DATA_OVERRIDE_EXTRA_KEYS: (keyof ExtraFormDataOverrideExtras)[] =
   ['relative_start', 'relative_end', 'time_grain_sqla'];
@@ -49,6 +48,8 @@ export const EXTRA_FORM_DATA_OVERRIDE_REGULAR_MAPPINGS: Record<
   time_column: 'time_column',
   time_grain: 'time_grain',
   time_range: 'time_range',
+  time_compare: 'time_compare',
+  visible_deckgl_layers: 'visible_deckgl_layers',
 };
 
 export const EXTRA_FORM_DATA_OVERRIDE_REGULAR_KEYS = Object.keys(
