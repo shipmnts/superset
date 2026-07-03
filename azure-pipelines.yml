@@ -88,7 +88,7 @@ stages:
               inputs:
                 action: deploy
                 connectionType: azureResourceManager
-                azureSubscriptionConnection: azure-nonprod
+                azureSubscriptionConnection: azure-arm
                 azureResourceGroup: HubNonProd
                 kubernetesCluster: $(k8sCluster)
                 namespace: default
@@ -119,7 +119,7 @@ stages:
               inputs:
                 action: deploy
                 connectionType: azureResourceManager
-                azureSubscriptionConnection: azure-nonprod
+                azureSubscriptionConnection: azure-arm
                 azureResourceGroup: HubNonProd
                 kubernetesCluster: $(k8sCluster)
                 namespace: default
@@ -150,7 +150,7 @@ stages:
               inputs:
                 action: deploy
                 connectionType: azureResourceManager
-                azureSubscriptionConnection: azure-nonprod
+                azureSubscriptionConnection: azure-arm
                 azureResourceGroup: HubNonProd
                 kubernetesCluster: $(k8sCluster)
                 namespace: default
