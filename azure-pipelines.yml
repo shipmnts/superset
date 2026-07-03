@@ -21,7 +21,7 @@ variables:
   k8sNamespace: 'default'
   k8sDeploymentName: 'superset'
   dockerfilePath: '**/Dockerfile'
-  poolName: 'SelfHosted'
+  poolName: 'SelfHostedXL'
   
 stages:
 - stage: Build
