@@ -789,8 +789,8 @@ class ImportV1DatabaseSchema(Schema):
     @validates_schema
     def validate_password(self, data: dict[str, Any], **kwargs: Any) -> None:
         """If sqlalchemy_uri has a masked password, password is required"""
-        uuid = data["uuid"]
-        existing = db.session.query(Database).filter_by(uuid=uuid).first()
+        database_name = data["database_name"]
+        existing = db.session.query(Database).filter_by(database_name=database_name).first()
         if existing:
             return
 
@@ -804,8 +804,8 @@ class ImportV1DatabaseSchema(Schema):
         self, data: dict[str, Any], **kwargs: Any
     ) -> None:
         """If ssh_tunnel has a masked credentials, credentials are required"""
-        uuid = data["uuid"]
-        existing = db.session.query(Database).filter_by(uuid=uuid).first()
+        database_name = data["database_name"]
+        existing = db.session.query(Database).filter_by(database_name=database_name).first()
         if existing:
             return
 

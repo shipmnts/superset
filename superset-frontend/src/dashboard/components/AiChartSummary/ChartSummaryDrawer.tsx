@@ -28,7 +28,7 @@ const ChartSummaryDrawer = (props: any) => {
         const { metric, viz_type, groupby, x_axis } = formdata;
         try {
           const response = await axios.post(
-            'https://api.development.shipmnts.com/turingbot/ai-chart-summarize',
+            'https://api.staging.shipmnts.com/turingbot/ai-chart-summarize',
             { data, metric, viz_type, groupby, x_axis },
             {
               headers: {

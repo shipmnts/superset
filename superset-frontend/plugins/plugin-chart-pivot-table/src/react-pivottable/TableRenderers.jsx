@@ -35,7 +35,7 @@ const parseLabel = value => {
       const label = anchorMatch[2];
 
       return (
-        <a href={href} target="_blank">
+        <a href={href} target="_blank" onClick={e => e.stopPropagation()}>
           {label}
         </a>
       );

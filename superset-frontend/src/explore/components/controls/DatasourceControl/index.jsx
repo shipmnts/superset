@@ -321,7 +321,9 @@ class DatasourceControl extends React.PureComponent {
             )}
           </Menu.Item>
         )}
-        <Menu.Item key={CHANGE_DATASET}>{t('Swap dataset')}</Menu.Item>
+        <Menu.Item key={CHANGE_DATASET} disabled={!allowEdit}>
+          {t('Swap dataset')}
+        </Menu.Item>
         {!isMissingDatasource && canAccessSqlLab && (
           <Menu.Item key={VIEW_IN_SQL_LAB}>
             <Link

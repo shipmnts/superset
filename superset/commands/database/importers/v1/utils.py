@@ -36,7 +36,7 @@ def import_database(
         "can_write",
         "Database",
     )
-    existing = db.session.query(Database).filter_by(uuid=config["uuid"]).first()
+    existing = db.session.query(Database).filter_by(database_name=config["database_name"]).first()
     if existing:
         if not overwrite or not can_write:
             return existing
