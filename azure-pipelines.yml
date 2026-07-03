@@ -76,15 +76,22 @@ stages:
     displayName: Deploy
     pool:
       vmImage: $(vmImageName)
-    environment: 'development.default'
+    environment: 'development'
+    variables:
+      k8sCluster: hub-development
     strategy:
       runOnce:
         deploy:
           steps:
-            - task: KubernetesManifest@0
+            - task: KubernetesManifest@1
               displayName: Deploy to Kubernetes cluster
               inputs:
                 action: deploy
+                connectionType: azureResourceManager
+                azureSubscriptionConnection: azure-nonprod
+                azureResourceGroup: HubNonProd
+                kubernetesCluster: $(k8sCluster)
+                namespace: default
                 manifests: |
                   $(Pipeline.Workspace)/deployment/development/superset-deployment.yaml
                 containers: |
@@ -100,15 +107,22 @@ stages:
     displayName: Deploy
     pool:
       vmImage: $(vmImageName)
-    environment: 'staging.default'
+    environment: 'staging'
+    variables:
+      k8sCluster: hub-staging
     strategy:
       runOnce:
         deploy:
           steps:
-            - task: KubernetesManifest@0
+            - task: KubernetesManifest@1
               displayName: Deploy to Kubernetes cluster
               inputs:
                 action: deploy
+                connectionType: azureResourceManager
+                azureSubscriptionConnection: azure-nonprod
+                azureResourceGroup: HubNonProd
+                kubernetesCluster: $(k8sCluster)
+                namespace: default
                 manifests: |
                   $(Pipeline.Workspace)/deployment/staging/superset-deployment.yaml
                 containers: |
@@ -124,15 +138,22 @@ stages:
     displayName: Deploy
     pool:
       vmImage: $(vmImageName)
-    environment: 'production.default'
+    environment: 'production'
+    variables:
+      k8sCluster: hub-prod
     strategy:
       runOnce:
         deploy:
           steps:
-            - task: KubernetesManifest@0
+            - task: KubernetesManifest@1
               displayName: Deploy to Kubernetes cluster
               inputs:
                 action: deploy
+                connectionType: azureResourceManager
+                azureSubscriptionConnection: azure-nonprod
+                azureResourceGroup: HubNonProd
+                kubernetesCluster: $(k8sCluster)
+                namespace: default
                 manifests: |
                   $(Pipeline.Workspace)/deployment/production/superset-deployment.yaml
                 containers: |
