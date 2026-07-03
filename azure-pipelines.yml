@@ -38,32 +38,30 @@ stages:
         command: login
         containerRegistry: $(dockerRegistryServiceConnection)
     - task: Bash@3
-      displayName: Pulling docker image
+      displayName: Ensure buildx builder
       inputs:
         targetType: inline
         script: |
-          docker pull $(imageRepository):$(Build.SourceBranchName) || exit 0
-    - task: Docker@2
-      displayName: Build image from dockerfile
+          docker buildx inspect superset-builder >/dev/null 2>&1 || \
+            docker buildx create --name superset-builder --driver docker-container --use
+          docker buildx use superset-builder
+          docker buildx inspect --bootstrap
+    - task: Bash@3
+      displayName: Build and push image
       inputs:
-        command: build
-        repository: $(imageRepository)
-        dockerfile: '**/Dockerfile'
-        tags: |
-          latest
-          $(tag)
-          $(Build.SourceBranchName)
-        arguments: '--cache-from $(imageRepository):$(Build.SourceBranchName) --build-arg BUILDKIT_INLINE_CACHE=1 --build-arg BRANCH=$(Build.SourceBranchName)'
-
-    - task: Docker@2
-      displayName: push image to container registry 
-      inputs:
-        command: push
-        repository: $(imageRepository)
-        tags: |
-          latest
-          $(tag)
-          $(Build.SourceBranchName)
+        targetType: inline
+        script: |
+          docker buildx build \
+            --builder superset-builder \
+            --file Dockerfile \
+            --build-arg BRANCH=$(Build.SourceBranchName) \
+            --cache-from type=registry,ref=$(imageRepository):buildcache-$(Build.SourceBranchName) \
+            --cache-to type=registry,ref=$(imageRepository):buildcache-$(Build.SourceBranchName),mode=max \
+            --tag $(imageRepository):latest \
+            --tag $(imageRepository):$(tag) \
+            --tag $(imageRepository):$(Build.SourceBranchName) \
+            --push \
+            .
     - upload: deployment
       artifact: deployment
 - stage: Development
