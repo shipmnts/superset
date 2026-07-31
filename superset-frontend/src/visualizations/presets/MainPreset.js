@@ -79,7 +79,7 @@ import { HandlebarsChartPlugin } from '@superset-ui/plugin-chart-handlebars';
 import { PopKPIPlugin } from '@superset-ui/plugin-chart-period-over-period-kpi';
 import { FilterPlugins } from 'src/constants';
 import TimeTableChartPlugin from '../TimeTable';
-import {Swimlane} from 'shipmnts-swimlane'
+import { Swimlane } from '@shipmnts/swimlane';
 
 export default class MainPreset extends Preset {
   constructor() {
