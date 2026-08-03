@@ -16,8 +16,9 @@ pr:
 
 variables:
   imageRepository: 'shipmnts/superset'
+  containerRegistry: 'shipmnts.azurecr.io'
   tag: '$(Build.BuildId)'
-  dockerRegistryServiceConnection: 'dockerhub-service-connection'
+  dockerRegistryServiceConnection: 'f4c49f70-1fb0-43e2-8754-5fd5f6235634'
   k8sNamespace: 'default'
   k8sDeploymentName: 'superset'
   dockerfilePath: '**/Dockerfile'
@@ -55,11 +56,11 @@ stages:
             --builder superset-builder \
             --file Dockerfile \
             --build-arg BRANCH=$(Build.SourceBranchName) \
-            --cache-from type=registry,ref=$(imageRepository):buildcache-$(Build.SourceBranchName) \
-            --cache-to type=registry,ref=$(imageRepository):buildcache-$(Build.SourceBranchName),mode=max \
-            --tag $(imageRepository):latest \
-            --tag $(imageRepository):$(tag) \
-            --tag $(imageRepository):$(Build.SourceBranchName) \
+            --cache-from type=registry,ref=$(containerRegistry)/$(imageRepository):buildcache-$(Build.SourceBranchName) \
+            --cache-to type=registry,ref=$(containerRegistry)/$(imageRepository):buildcache-$(Build.SourceBranchName),mode=max \
+            --tag $(containerRegistry)/$(imageRepository):latest \
+            --tag $(containerRegistry)/$(imageRepository):$(tag) \
+            --tag $(containerRegistry)/$(imageRepository):$(Build.SourceBranchName) \
             --push \
             .
     - upload: deployment
@@ -124,7 +125,7 @@ stages:
                 manifests: |
                   $(Pipeline.Workspace)/deployment/staging/superset-deployment.yaml
                 containers: |
-                  $(imageRepository):$(tag)
+                  $(containerRegistry)/$(imageRepository):$(tag)
 
 - stage: Production
   condition: and(succeeded(), eq(variables['build.SourceBranchName'], 'production'))
