@@ -59,6 +59,18 @@ SQLLAB_CTAS_NO_LIMIT = True
 # Fork override (was a core patch on 4.0.2; config-only since 6.1.0 upgrade):
 # large dashboards exceed the default position-data size limit.
 SUPERSET_DASHBOARD_POSITION_DATA_LIMIT = 85535
+
+# ------------------ MCP service (AI integration) ---------------------
+# Consumed by the `superset mcp run` process (separate container in the
+# staging deployment, port 5008). Lets MCP clients (Claude, ChatGPT, ...)
+# explore datasets, run SQL, build charts/dashboards.
+#
+# REVIEW NOTE (senior dev): dev-mode auth — every MCP request acts as this
+# single Superset user. Acceptable only if the /mcp route is NOT publicly
+# reachable on staging. If staging is internet-exposed, switch to JWT:
+#   MCP_AUTH_ENABLED = True   (+ JWT issuer/audience/secret per
+#   superset/mcp_service/PRODUCTION.md) and remove MCP_DEV_USERNAME.
+MCP_DEV_USERNAME = os.getenv('MCP_DEV_USERNAME', 'admin')
 # ------------------ Embedded Configurations --------------------
 
 BASE_URL = os.getenv('SUPERSET_URL')
