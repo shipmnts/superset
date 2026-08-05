@@ -74,7 +74,11 @@ stages:
               DRIVER=`docker info --format '{{.Driver}}' 2>/dev/null`
               echo "storage driver = $DRIVER"
               docker info 2>/dev/null | grep -E 'Server Version|Backing Filesystem|Docker Root Dir|CPUs|Total Memory'
-              if [ "$DRIVER" != "overlay2" ]; then
+              # Accept both names: Docker <=28 with the classic image store reports
+              # "overlay2"; Docker 29+ with the containerd image store reports
+              # "overlayfs" (the containerd snapshotter). Both are real copy-on-write
+              # overlay — only vfs and fuse-overlayfs are the slow fallbacks.
+              if [ "$DRIVER" != "overlay2" ] && [ "$DRIVER" != "overlayfs" ]; then
                 echo ">>> ROOT CAUSE: driver is '$DRIVER', not overlay2."
                 echo ">>> overlay2 stores a layer as a copy-on-write DIFF (near-zero cost)."
                 echo ">>> vfs / fuse-overlayfs have NO copy-on-write: each layer is a full"
