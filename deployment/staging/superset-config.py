@@ -36,6 +36,23 @@ SQLALCHEMY_DATABASE_URI = 'postgresql://{0}:{1}@{2}:{3}/{4}'.format(
     POSTGRES_DB
 )
 
+# Metadata DB connection pool.
+# Defaults (pool_size=5, max_overflow=10) give only 15 connections per process,
+# which is fewer than the 20 gunicorn gthreads run-server.sh starts. Under load
+# threads queue on the pool and fail with:
+#   sqlalchemy.exc.TimeoutError: QueuePool limit of size 5 overflow 10 reached,
+#   connection timed out, timeout 30.00
+SQLALCHEMY_ENGINE_OPTIONS = {
+    # keep at least one connection per gunicorn thread (SERVER_THREADS_AMOUNT)
+    'pool_size': int(os.getenv('SQLALCHEMY_POOL_SIZE', 20)),
+    # burst room above pool_size; set to -1 for unlimited if Postgres has headroom
+    'max_overflow': int(os.getenv('SQLALCHEMY_MAX_OVERFLOW', 20)),
+    'pool_timeout': int(os.getenv('SQLALCHEMY_POOL_TIMEOUT', 60)),
+    # recycle before Postgres/proxy drops idle connections
+    'pool_recycle': int(os.getenv('SQLALCHEMY_POOL_RECYCLE', 300)),
+    'pool_pre_ping': True,
+}
+
 #---------------DEBUGGING--------------------
 
 DEBUG=True
