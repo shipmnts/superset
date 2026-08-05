@@ -43,6 +43,89 @@ stages:
         pool:
           name: $(poolName)
         steps:
+          # ---------------------------------------------------------------------
+          # TEMPORARY diagnostic. Delete once the agent is fixed.
+          #
+          # Build regressed from minutes (Microsoft-hosted ubuntu-latest) to ~2h
+          # (SelfHosted GKE agent) with the SAME 4 vCPU. The frontend build is
+          # bound by filesystem syscalls, not CPU, so machine size is irrelevant.
+          # This step identifies which of the three I/O-level causes it is and
+          # prints its own verdict. Runs first, takes ~30s, does not block the
+          # build that follows.
+          #
+          # NOTE: no $( ) anywhere below — Azure DevOps expands $(x) as a pipeline
+          # macro before bash runs. Backticks and `expr` are used instead.
+          # ---------------------------------------------------------------------
+          - bash: |
+              set +e
+
+              echo "############ 1. ARCHITECTURE — QEMU emulation? ############"
+              ARCH=`uname -m`
+              echo "arch = $ARCH"
+              if [ "$ARCH" != "x86_64" ]; then
+                echo ">>> ROOT CAUSE: agent is $ARCH, image is amd64 (see libc6_*_amd64.deb"
+                echo ">>> in the build log). Every instruction runs under QEMU. 10-20x."
+                echo ">>> FIX: move agent to an amd64 machine type (n2/c3), not c4a/t2a."
+              else
+                echo "OK — native amd64, no emulation."
+              fi
+
+              echo "############ 2. DOCKER STORAGE DRIVER — the prime suspect ############"
+              DRIVER=`docker info --format '{{.Driver}}' 2>/dev/null`
+              echo "storage driver = $DRIVER"
+              docker info 2>/dev/null | grep -E 'Server Version|Backing Filesystem|Docker Root Dir|CPUs|Total Memory'
+              if [ "$DRIVER" != "overlay2" ]; then
+                echo ">>> ROOT CAUSE: driver is '$DRIVER', not overlay2."
+                echo ">>> overlay2 stores a layer as a copy-on-write DIFF (near-zero cost)."
+                echo ">>> vfs / fuse-overlayfs have NO copy-on-write: each layer is a full"
+                echo ">>> recursive copy of everything below it. node_modules is ~200k files,"
+                echo ">>> so all ~10 steps after 'npm install' recopy all 200k files each."
+                echo ">>> Millions of serial syscalls. Extra CPU cannot help — this is why"
+                echo ">>> the bigger machine changed nothing."
+                echo ">>> CAUSE: overlay2 cannot nest on overlayfs, so Docker-inside-a-"
+                echo ">>> container silently falls back. No error is logged."
+                echo ">>> FIX: give dockerd a real block device at /var/lib/docker"
+                echo ">>>      (privileged DinD + pd-ssd PVC or Local SSD), or run the"
+                echo ">>>      agent on a plain GCE VM with native Docker."
+              else
+                echo "OK — overlay2."
+              fi
+
+              echo "############ 3. DISK IOPS — what npm install actually does ############"
+              ROOT=`docker info --format '{{.DockerRootDir}}' 2>/dev/null`
+              if [ -z "$ROOT" ]; then ROOT=/var/lib/docker; fi
+              df -hT "$ROOT" 2>/dev/null || df -hT /
+              mkdir -p /tmp/iotest && cd /tmp/iotest
+              START=`date +%s`
+              i=0
+              while [ "$i" -lt 3000 ]; do echo x > "f$i"; i=`expr $i + 1`; done
+              sync
+              END=`date +%s`
+              ELAPSED=`expr $END - $START`
+              cd / && rm -rf /tmp/iotest
+              echo "3000 small-file writes took ${ELAPSED}s"
+              if [ "$ELAPSED" -gt 20 ]; then
+                echo ">>> ROOT CAUSE: disk IOPS starved. Local NVMe does this in under 3s."
+                echo ">>> Microsoft-hosted agents use local SSD; GKE nodes use network-"
+                echo ">>> attached PD, and GCP IOPS scale with disk SIZE and TYPE."
+                echo ">>> pd-standard = 0.75 IOPS/GB, so 100GB gives ~75 IOPS."
+                echo ">>> FIX: pd-ssd or Local SSD, sized >=200GB."
+              else
+                echo "OK — small-file I/O acceptable (${ELAPSED}s)."
+              fi
+
+              echo "############ 4. DOES THE LAYER CACHE SURVIVE BETWEEN BUILDS? ############"
+              echo "If 'Build Cache' is ~0B on a REPEAT build of the same commit, nothing"
+              echo "persists between jobs and every build pays the full frontend cost —"
+              echo "--cache-from cannot help, because BUILDKIT_INLINE_CACHE is min-mode"
+              echo "and never contains the frontend-builder intermediate stage."
+              docker system df 2>/dev/null
+              docker buildx du 2>/dev/null | tail -3
+
+              exit 0
+            displayName: "DIAG: agent environment"
+            continueOnError: true
+
           - task: Docker@2
             displayName: Login to registry
             inputs:
