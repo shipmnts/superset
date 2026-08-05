@@ -11,149 +11,140 @@ trigger:
 pr:
   branches:
     exclude:
-      - '*'
+      - "*"
     include: []
 
 variables:
-  imageRepository: 'shipmnts/superset'
-  containerRegistry: 'shipmnts.azurecr.io'
-  tag: '$(Build.BuildId)'
-  dockerRegistryServiceConnection: 'f4c49f70-1fb0-43e2-8754-5fd5f6235634'
-  k8sNamespace: 'default'
-  k8sDeploymentName: 'superset'
-  dockerfilePath: '**/Dockerfile'
-  poolName: 'SelfHostedXL'
-  
+  imageRepository: "shipmnts/superset"
+  containerRegistry: "shipmnts.azurecr.io"
+  tag: "$(Build.BuildId)"
+  dockerRegistryServiceConnection: "f4c49f70-1fb0-43e2-8754-5fd5f6235634"
+  k8sNamespace: "default"
+  k8sDeploymentName: "superset"
+  dockerfilePath: "**/Dockerfile"
+  poolName: "SelfHostedXL"
+
 stages:
-- stage: Build
-  displayName: Build stage
-  jobs:
-  - job: Build
-    displayName: Build
-    pool:
-      name: $(poolName)
-    steps:
-    - task: Docker@2
-      displayName: Login to registry
-      inputs:
-        command: login
-        containerRegistry: $(dockerRegistryServiceConnection)
-    - task: Bash@3
-      displayName: Ensure buildx builder
-      inputs:
-        targetType: inline
-        script: |
-          docker buildx inspect superset-builder >/dev/null 2>&1 || \
-            docker buildx create --name superset-builder --driver docker-container --use
-          docker buildx use superset-builder
-          docker buildx inspect --bootstrap
-    - task: Bash@3
-      displayName: Build and push image
-      inputs:
-        targetType: inline
-        script: |
-          docker buildx build \
-            --builder superset-builder \
-            --file Dockerfile \
-            --build-arg BRANCH=$(Build.SourceBranchName) \
-            --cache-from type=registry,ref=$(containerRegistry)/$(imageRepository):buildcache-$(Build.SourceBranchName) \
-            --cache-to type=registry,ref=$(containerRegistry)/$(imageRepository):buildcache-$(Build.SourceBranchName),mode=max \
-            --tag $(containerRegistry)/$(imageRepository):latest \
-            --tag $(containerRegistry)/$(imageRepository):$(tag) \
-            --tag $(containerRegistry)/$(imageRepository):$(Build.SourceBranchName) \
-            --push \
-            .
-    - upload: deployment
-      artifact: deployment
-- stage: Development
-  condition: and(succeeded(), eq(variables['build.SourceBranchName'], 'development'))
-  displayName: Development Deploy stage
-  dependsOn: Build
+  - stage: Build
+    displayName: Build stage
+    jobs:
+      - job: Build
+        displayName: Build
+        pool:
+          name: $(poolName)
+        steps:
+          - task: Docker@2
+            displayName: Login to registry
+            inputs:
+              command: login
+              containerRegistry: $(dockerRegistryServiceConnection)
+          - task: Docker@2
+            displayName: Build image from dockerfile
+            inputs:
+              targetType: inline
+              script: |
+                docker buildx build \
+                  --builder superset-builder \
+                  --file Dockerfile \
+                  --build-arg BRANCH=$(Build.SourceBranchName) \
+                  --cache-from type=registry,ref=$(containerRegistry)/$(imageRepository):buildcache-$(Build.SourceBranchName) \
+                  --cache-to type=registry,ref=$(containerRegistry)/$(imageRepository):buildcache-$(Build.SourceBranchName),mode=max \
+                  --tag $(containerRegistry)/$(imageRepository):latest \
+                  --tag $(containerRegistry)/$(imageRepository):$(tag) \
+                  --tag $(containerRegistry)/$(imageRepository):$(Build.SourceBranchName) \
+                  --push \
+                  .
+          - upload: deployment
+            artifact: deployment
+  - stage: Development
+    condition: and(succeeded(), eq(variables['build.SourceBranchName'], 'development'))
+    displayName: Development Deploy stage
+    dependsOn: Build
 
-  jobs:
-  - deployment: Deploy
-    displayName: Deploy
-    pool:
-      name: $(poolName)
-    environment: 'development'
-    variables:
-      k8sCluster: hub-development
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-            - task: KubernetesManifest@1
-              displayName: Deploy to Kubernetes cluster
-              inputs:
-                action: deploy
-                connectionType: azureResourceManager
-                azureSubscriptionConnection: azure-arm
-                azureResourceGroup: HubNonProd
-                kubernetesCluster: $(k8sCluster)
-                namespace: default
-                manifests: |
-                  $(Pipeline.Workspace)/deployment/development/superset-deployment.yaml
-                containers: |
-                  $(imageRepository):$(tag)
+    jobs:
+      - deployment: Deploy
+        displayName: Deploy
+        pool:
+          name: $(poolName)
+        environment: "development"
+        variables:
+          k8sCluster: hub-development
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: KubernetesManifest@1
+                  displayName: Deploy to Kubernetes cluster
+                  inputs:
+                    action: deploy
+                    connectionType: azureResourceManager
+                    azureSubscriptionConnection: azure-arm
+                    azureResourceGroup: HubNonProd
+                    kubernetesCluster: $(k8sCluster)
+                    namespace: default
+                    manifests: |
+                      $(Pipeline.Workspace)/deployment/development/superset-deployment.yaml
+                    containers: |
+                      $(imageRepository):$(tag)
 
-- stage: Staging
-  condition: and(succeeded(), eq(variables['build.SourceBranchName'], 'staging'))
-  displayName: Staging Deploy stage
-  dependsOn: Build
+  - stage: Staging
+    condition: and(succeeded(), eq(variables['build.SourceBranchName'], 'staging'))
+    displayName: Staging Deploy stage
+    dependsOn: Build
 
-  jobs:
-  - deployment: Deploy
-    displayName: Deploy
-    pool:
-      name: $(poolName)
-    environment: 'staging'
-    variables:
-      k8sCluster: hub-staging
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-            - task: KubernetesManifest@1
-              displayName: Deploy to Kubernetes cluster
-              inputs:
-                action: deploy
-                connectionType: azureResourceManager
-                azureSubscriptionConnection: azure-arm
-                azureResourceGroup: HubNonProd
-                kubernetesCluster: $(k8sCluster)
-                namespace: default
-                manifests: |
-                  $(Pipeline.Workspace)/deployment/staging/superset-deployment.yaml
-                containers: |
-                  $(containerRegistry)/$(imageRepository):$(tag)
+    jobs:
+      - deployment: Deploy
+        displayName: Deploy
+        pool:
+          name: $(poolName)
+        environment: "staging"
+        variables:
+          k8sCluster: hub-staging
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: KubernetesManifest@1
+                  displayName: Deploy to Kubernetes cluster
+                  inputs:
+                    action: deploy
+                    connectionType: azureResourceManager
+                    azureSubscriptionConnection: azure-arm
+                    azureResourceGroup: HubNonProd
+                    kubernetesCluster: $(k8sCluster)
+                    namespace: default
+                    manifests: |
+                      $(Pipeline.Workspace)/deployment/staging/superset-deployment.yaml
+                    containers: |
+                      $(containerRegistry)/$(imageRepository):$(tag)
 
-- stage: Production
-  condition: and(succeeded(), eq(variables['build.SourceBranchName'], 'production'))
-  displayName: Production Deploy stage
-  dependsOn: Build
+  - stage: Production
+    condition: and(succeeded(), eq(variables['build.SourceBranchName'], 'production'))
+    displayName: Production Deploy stage
+    dependsOn: Build
 
-  jobs:
-  - deployment: Deploy
-    displayName: Deploy
-    pool:
-      name: $(poolName)
-    environment: 'production'
-    variables:
-      k8sCluster: hub-prod
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-            - task: KubernetesManifest@1
-              displayName: Deploy to Kubernetes cluster
-              inputs:
-                action: deploy
-                connectionType: azureResourceManager
-                azureSubscriptionConnection: azure-arm
-                azureResourceGroup: HubNonProd
-                kubernetesCluster: $(k8sCluster)
-                namespace: default
-                manifests: |
-                  $(Pipeline.Workspace)/deployment/production/superset-deployment.yaml
-                containers: |
-                  $(imageRepository):$(tag)
+    jobs:
+      - deployment: Deploy
+        displayName: Deploy
+        pool:
+          name: $(poolName)
+        environment: "production"
+        variables:
+          k8sCluster: hub-prod
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: KubernetesManifest@1
+                  displayName: Deploy to Kubernetes cluster
+                  inputs:
+                    action: deploy
+                    connectionType: azureResourceManager
+                    azureSubscriptionConnection: azure-arm
+                    azureResourceGroup: HubNonProd
+                    kubernetesCluster: $(k8sCluster)
+                    namespace: default
+                    manifests: |
+                      $(Pipeline.Workspace)/deployment/production/superset-deployment.yaml
+                    containers: |
+                      $(imageRepository):$(tag)
