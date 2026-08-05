@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: superset
-          image: shipmnts/superset
+          image: shipmnts/superset:__tag__
           ports:
             - containerPort: 8088
           envFrom:
