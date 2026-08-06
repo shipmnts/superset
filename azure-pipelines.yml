@@ -40,8 +40,9 @@ pr:
 
 variables:
   imageRepository: "shipmnts/superset"
+  containerRegistry: "shipmnts.azurecr.io"
   tag: "$(Build.BuildId)"
-  dockerRegistryServiceConnection: "dockerhub-service-connection"
+  dockerRegistryServiceConnection: "f4c49f70-1fb0-43e2-8754-5fd5f6235634"
   k8sNamespace: "default"
   k8sDeploymentName: "superset"
   dockerfilePath: "**/Dockerfile"
@@ -82,7 +83,7 @@ stages:
                 latest
                 $(tag)
                 $(Build.SourceBranchName)
-              arguments: "--cache-from $(imageRepository):$(Build.SourceBranchName) --build-arg BUILDKIT_INLINE_CACHE=1 --build-arg BRANCH=$(Build.SourceBranchName)"
+              arguments: "--cache-from $(containerRegistry)/$(imageRepository):$(Build.SourceBranchName) --build-arg BUILDKIT_INLINE_CACHE=1 --build-arg BRANCH=$(Build.SourceBranchName)"
 
           - task: Docker@2
             displayName: push image to container registry
