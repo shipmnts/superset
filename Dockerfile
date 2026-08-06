@@ -14,7 +14,7 @@ COPY --parents superset-frontend/plugins/*/package.json superset-frontend/plugin
 COPY --parents superset-frontend/packages/*/package.json superset-frontend/packages/*/package-lock.json  ../
 
 RUN --mount=type=cache,target=/root/.npm,sharing=locked \
-    npm install --force
+    npm install --verbose
 
 WORKDIR /app
 COPY superset-frontend ./superset-frontend
