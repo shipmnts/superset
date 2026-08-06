@@ -1,0 +1,48 @@
+# Deploy superset to a GKE cluster.
+#
+# Replaces the old KubernetesManifest@0 task, which required a Kubernetes
+# service connection registered as a resource inside the ADO environment
+# (`<env>.default`). GKE is reached with gcloud Workload Identity Federation
+# instead, so the image tag is baked into the manifest by replacetokens
+# (__tag__) rather than patched by the task's `containers:` input.
+
+parameters:
+  - name: manifestDir # development | staging | production
+    type: string
+  - name: cluster
+    type: string
+  - name: project
+    type: string
+  - name: location
+    type: string
+  - name: credsFile
+    type: string
+    default: /opt/gcp/gcp-creds.json
+  - name: namespace
+    type: string
+    default: default
+
+steps:
+  - task: qetza.replacetokens.replacetokens-task.replacetokens@6
+    displayName: Replace tokens
+    inputs:
+      root: $(Pipeline.Workspace)/deployment
+      sources: ${{ parameters.manifestDir }}/superset-deployment.yaml
+      missingVarLog: error
+      tokenPattern: doubleunderscores
+
+  - template: gke-auth-steps.yml
+    parameters:
+      cluster: ${{ parameters.cluster }}
+      project: ${{ parameters.project }}
+      location: ${{ parameters.location }}
+      credsFile: ${{ parameters.credsFile }}
+
+  - bash: |
+      set -euo pipefail
+      MANIFEST="$(Pipeline.Workspace)/deployment/${{ parameters.manifestDir }}/superset-deployment.yaml"
+      kubectl -n ${{ parameters.namespace }} apply -f "$MANIFEST"
+      for d in $(kubectl -n ${{ parameters.namespace }} get -f "$MANIFEST" -o name | grep '^deployment.apps/'); do
+        kubectl -n ${{ parameters.namespace }} rollout status "$d" --timeout=600s
+      done
+    displayName: Deploy to Kubernetes
