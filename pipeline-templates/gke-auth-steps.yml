@@ -1,0 +1,31 @@
+# Authenticate to a private GKE cluster from an Azure Pipelines agent.
+# Uses Workload Identity Federation (no keys) + the IAM-gated DNS endpoint (no VPN).
+# The creds file is placed on every agent VM by the VMSS provisioning script.
+# Writes an isolated kubeconfig and exports KUBECONFIG for all subsequent steps
+# in the job, so parallel jobs on one agent never fight over ~/.kube/config.
+#
+# Kept in sync with mono-operations/pipeline-templates/gke-auth-steps.yml.
+
+parameters:
+  - name: cluster
+    type: string
+  - name: project
+    type: string
+  - name: location
+    type: string
+  - name: credsFile
+    type: string
+    default: /opt/gcp/gcp-creds.json
+
+steps:
+  - bash: |
+      set -euo pipefail
+      export KUBECONFIG="$(Agent.TempDirectory)/gke-kubeconfig"
+      gcloud auth login --cred-file='${{ parameters.credsFile }}' --quiet
+      gcloud container clusters get-credentials '${{ parameters.cluster }}' \
+        --project '${{ parameters.project }}' \
+        --location '${{ parameters.location }}' \
+        --dns-endpoint
+      echo "##vso[task.setvariable variable=KUBECONFIG]$KUBECONFIG"
+      kubectl version --client >/dev/null # fail fast if tooling is missing
+    displayName: Authenticate to GKE (${{ parameters.cluster }})

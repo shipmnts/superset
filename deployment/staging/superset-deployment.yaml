@@ -13,9 +13,11 @@ spec:
       labels:
         app: superset
     spec:
+      imagePullSecrets:
+        - name: acr-pull
       containers:
         - name: superset
-          image: shipmnts/superset
+          image: shipmnts.azurecr.io/shipmnts/superset:__tag__
           ports:
             - containerPort: 8088
           envFrom:
