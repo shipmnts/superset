@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7-labs
 
-FROM apache/superset:4.0.2
+FROM apache/superset:6.1.0
 ENV SUPERSET_HOME=/app
 ENV TEMP_DIR=/app/temp-superset
 ENV BUILD_SUPERSET_FRONTEND_IN_DOCKER=true
@@ -18,9 +18,8 @@ RUN apt-get update && \
     zstd \
     curl git \
     gnupg && \
-    curl -sL https://deb.nodesource.com/setup_16.x | bash - && \
-    apt-get install -y nodejs && \
-    npm install -g npm@8.19.4
+    curl -sL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y nodejs
 
 
 
@@ -30,7 +29,9 @@ COPY --chown=superset:superset --parents superset-frontend/plugins/*/package.jso
 COPY --chown=superset:superset --parents superset-frontend/packages/*/package.json superset-frontend/packages/*/package-lock.json  ../
 USER superset
 
-RUN npm install --force
+# Lockfile is consistent on 6.1.0 (swimlane react peer handled via package.json
+# overrides), so use the reproducible npm ci instead of the old `install --force`.
+RUN npm ci
 
 WORKDIR ${SUPERSET_HOME}
 COPY superset-frontend ./superset-frontend

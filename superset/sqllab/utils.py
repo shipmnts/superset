@@ -38,6 +38,8 @@ DATABASE_KEYS = [
     "force_ctas_schema",
     "id",
     "disable_data_preview",
+    "disable_drill_to_detail",
+    "allow_multi_catalog",
 ]
 
 
@@ -83,10 +85,14 @@ def bootstrap_sqllab_data(user_id: int | None) -> dict[str, Any]:
     active_tab: Any = None
     databases: dict[int, Any] = {}
     for database in DatabaseDAO.find_all():
+        json_data = database.to_json()
         databases[database.id] = {
-            k: v for k, v in database.to_json().items() if k in DATABASE_KEYS
+            k: json_data[k] if k in json_data else getattr(database, k, None)
+            for k in DATABASE_KEYS
         }
-        databases[database.id]["backend"] = database.backend
+        databases[database.id]["allows_virtual_table_explore"] = (
+            database.allows_virtual_table_explore
+        )
 
     # These are unnecessary if sqllab backend persistence is disabled
     if is_feature_enabled("SQLLAB_BACKEND_PERSISTENCE"):

@@ -10,7 +10,9 @@
 # instead of being patched by KubernetesManifest@0.
 #
 # Per-env superset_config.py / requirements-local.txt are baked into the image
-# at build time from deployment/$(Build.SourceBranchName)/ via the BRANCH arg.
+# at build time from deployment/$(deployEnv)/ via the BRANCH arg. deployEnv is
+# normally the branch name; see the `variables` block for the one branch where
+# the two differ.
 #
 # AGENTS — the two stages deliberately run on different agents:
 #   Build   -> vmImage: ubuntu-latest  (Microsoft-hosted)
@@ -31,6 +33,10 @@ trigger:
   - development
   - staging
   - production
+  # Superset 6.1.0 upgrade branch. Deploys to the staging cluster alongside the
+  # 4.0.2 `staging` branch so 6.1.0 can be validated there before it becomes
+  # `staging`. Drop this entry once the upgrade is merged into `staging`.
+  - upgrade/superset-6.1.0-staging
 
 pr:
   branches:
@@ -51,6 +57,17 @@ variables:
   vmImageName: "ubuntu-latest"
   poolName: "SelfHosted"
   DOCKER_BUILDKIT: 1
+
+  # Which deployment/<env>/ directory this build bakes into the image, and which
+  # cluster it deploys to. For development/staging/production the branch name IS
+  # the env, but the 6.1.0 upgrade branch resolves Build.SourceBranchName to
+  # `superset-6.1.0-staging` — not a directory under deployment/ — so map it back
+  # to `staging`. Matching on the full ref avoids colliding with a same-named
+  # branch under another prefix.
+  ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/upgrade/superset-6.1.0-staging') }}:
+    deployEnv: "staging"
+  ${{ else }}:
+    deployEnv: "$(Build.SourceBranchName)"
 
 stages:
   - stage: Build
@@ -83,7 +100,9 @@ stages:
                 latest
                 $(tag)
                 $(Build.SourceBranchName)
-              arguments: "--cache-from $(containerRegistry)/$(imageRepository):$(Build.SourceBranchName) --build-arg BUILDKIT_INLINE_CACHE=1 --build-arg BRANCH=$(Build.SourceBranchName)"
+              # cache-from stays keyed on the branch name so each branch keeps its
+              # own cache lane; BRANCH selects the deployment/<env>/ config dir.
+              arguments: "--cache-from $(containerRegistry)/$(imageRepository):$(Build.SourceBranchName) --build-arg BUILDKIT_INLINE_CACHE=1 --build-arg BRANCH=$(deployEnv)"
 
           - task: Docker@2
             displayName: push image to container registry
@@ -130,7 +149,12 @@ stages:
                     credsFile: $(gcpCredsFile)
 
   - stage: Staging
-    condition: and(succeeded(), eq(variables['build.SourceBranchName'], 'staging'))
+    # Two branches deploy here: `staging` (4.0.2) and the 6.1.0 upgrade branch.
+    # Both use deployment/staging/, so manifestDir below stays hardcoded.
+    condition: >-
+      and(succeeded(),
+          or(eq(variables['Build.SourceBranch'], 'refs/heads/staging'),
+             eq(variables['Build.SourceBranch'], 'refs/heads/upgrade/superset-6.1.0-staging')))
     displayName: Staging Deploy stage
     dependsOn: Build
     variables:
