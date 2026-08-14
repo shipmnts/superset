@@ -160,6 +160,8 @@ DEFAULT_TIME_FILTER = NO_TIME_RANGE
 # (gunicorn, nginx, apache, ...) timeout setting to be <= to this setting
 SUPERSET_WEBSERVER_TIMEOUT = int(timedelta(minutes=1).total_seconds())
 
+DASHBOARD_MAX_CONCURRENT_CHART_REQUESTS = 4
+
 # this 2 settings are used by dashboard period force refresh feature
 # When user choose auto force refresh frequency
 # < SUPERSET_DASHBOARD_PERIODICAL_REFRESH_LIMIT

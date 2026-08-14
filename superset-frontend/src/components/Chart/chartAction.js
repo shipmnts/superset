@@ -43,6 +43,27 @@ import { allowCrossDomain as domainShardingEnabled } from 'src/utils/hostNamesCo
 import { updateDataMask } from 'src/dataMask/actions';
 import { waitForAsyncData } from 'src/middleware/asyncEvent';
 import { safeStringify } from 'src/utils/safeStringify';
+import { createConcurrencyLimiter } from 'src/utils/concurrencyLimit';
+
+export const DEFAULT_MAX_CONCURRENT_CHART_REQUESTS = 5;
+
+let chartRequestLimiter;
+
+export function runWithChartRequestLimit(getState, task) {
+  if (!chartRequestLimiter) {
+    const configured =
+      getState()?.common?.conf?.DASHBOARD_MAX_CONCURRENT_CHART_REQUESTS;
+    chartRequestLimiter = createConcurrencyLimiter(
+      configured ?? DEFAULT_MAX_CONCURRENT_CHART_REQUESTS,
+    );
+  }
+  return chartRequestLimiter(task);
+}
+
+// Exported for tests: the limiter is module state and must not leak between them.
+export function resetChartRequestLimiter() {
+  chartRequestLimiter = undefined;
+}
 
 export const CHART_UPDATE_STARTED = 'CHART_UPDATE_STARTED';
 export function chartUpdateStarted(queryController, latestQueryFormData, key) {
@@ -419,16 +440,18 @@ export function exploreJSON(
     const setDataMask = dataMask => {
       dispatch(updateDataMask(formData.slice_id, dataMask));
     };
-    const chartDataRequest = getChartDataRequest({
-      setDataMask,
-      formData,
-      resultFormat: 'json',
-      resultType: 'full',
-      force,
-      method: 'POST',
-      requestParams,
-      ownState,
-    });
+    const chartDataRequest = runWithChartRequestLimit(getState, () =>
+      getChartDataRequest({
+        setDataMask,
+        formData,
+        resultFormat: 'json',
+        resultType: 'full',
+        force,
+        method: 'POST',
+        requestParams,
+        ownState,
+      }),
+    );
 
     dispatch(chartUpdateStarted(controller, formData, key));
 
@@ -608,11 +631,11 @@ export const getDatasourceSamples = async (
     }
     const updated_payload = {
       ...jsonPayload,
-      url_params: existingParams
-    }
+      url_params: existingParams,
+    };
     const response = await SupersetClient.post({
       endpoint: '/datasource/samples',
-      jsonPayload:updated_payload,
+      jsonPayload: updated_payload,
       searchParams,
       parseMethod: 'json-bigint',
     });
