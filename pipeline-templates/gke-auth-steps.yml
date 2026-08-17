@@ -1,8 +1,12 @@
 # Authenticate to a private GKE cluster from an Azure Pipelines agent.
 # Uses Workload Identity Federation (no keys) + the IAM-gated DNS endpoint (no VPN).
 # The creds file is placed on every agent VM by the VMSS provisioning script.
-# Writes an isolated kubeconfig and exports KUBECONFIG for all subsequent steps
-# in the job, so parallel jobs on one agent never fight over ~/.kube/config.
+# Writes an isolated kubeconfig and gcloud config under job-unique paths (self-hosted
+# agents reuse the same VM/OS user across unrelated jobs — they don't get a fresh VM
+# per job — so a shared, well-known path would let a later job on the same agent
+# inherit this job's active GCP identity or leftover kubeconfig). Exports both paths
+# for all subsequent steps in the job. Pair this with gke-cleanup-steps.yml as the
+# LAST step of the deploy job (condition: always()) to revoke and delete them.
 #
 # Kept in sync with mono-operations/pipeline-templates/gke-auth-steps.yml.
 
@@ -18,14 +22,28 @@ parameters:
     default: /opt/gcp/gcp-creds.json
 
 steps:
+  - template: /pipeline-templates/require-environment.yml
   - bash: |
       set -euo pipefail
-      export KUBECONFIG="$(Agent.TempDirectory)/gke-kubeconfig"
+      cluster='${{ parameters.cluster }}'
+      project='${{ parameters.project }}'
+      location='${{ parameters.location }}'
+      if [ -z "$cluster" ] || [ -z "$project" ] || [ -z "$location" ]; then
+        echo "##vso[task.logissue type=error]Refusing to deploy: cluster/project/location resolved empty for branch '$(Build.SourceBranchName)'. This pipeline's per-branch variables: block has no mapping for this branch — add it before retrying."
+        exit 1
+      fi
+    displayName: Validate GKE target is set
+  - bash: |
+      set -euo pipefail
+      export CLOUDSDK_CONFIG="$(Agent.TempDirectory)/gcloud-config-$(System.JobId)"
+      export KUBECONFIG="$(Agent.TempDirectory)/gke-kubeconfig-$(System.JobId)"
+      mkdir -p "$CLOUDSDK_CONFIG"
       gcloud auth login --cred-file='${{ parameters.credsFile }}' --quiet
       gcloud container clusters get-credentials '${{ parameters.cluster }}' \
         --project '${{ parameters.project }}' \
         --location '${{ parameters.location }}' \
         --dns-endpoint
+      echo "##vso[task.setvariable variable=CLOUDSDK_CONFIG]$CLOUDSDK_CONFIG"
       echo "##vso[task.setvariable variable=KUBECONFIG]$KUBECONFIG"
       kubectl version --client >/dev/null # fail fast if tooling is missing
     displayName: Authenticate to GKE (${{ parameters.cluster }})

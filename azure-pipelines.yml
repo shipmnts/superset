@@ -28,7 +28,6 @@
 #   The deploy stages only run kubectl, so the small disk does not affect them.
 
 trigger:
-  - development
   - staging
   - production
 
@@ -97,89 +96,51 @@ stages:
           - upload: deployment
             artifact: deployment
 
-  - stage: Development
-    condition: and(succeeded(), eq(variables['build.SourceBranchName'], 'development'))
-    displayName: Development Deploy stage
+  # ─────────────────────────────────────────────────────────────
+  # DEPLOY
+  # GKE target + manifest-dir variables are selected at queue time from the
+  # source branch. No development deploy — no hub-development cluster exists.
+  # To add a new environment: add its branch to trigger, a matching
+  # variables: block below, AND a matching environment: block on the job —
+  # all three must stay in sync.
+  # ─────────────────────────────────────────────────────────────
+  - stage: Deploy
+    displayName: Deploy stage
     dependsOn: Build
+    condition: |
+      and(
+        succeeded('Build'),
+        in(variables['Build.SourceBranchName'], 'staging', 'production')
+      )
     variables:
-      # NOTE: no hub-development cluster exists in GKE yet — add an entry to the
-      # environments map in mono-operations deployment/terraform/gcp/nonprod
-      # before pushing to the development branch, or this stage will fail on
-      # `get-credentials`.
-      gkeCluster: hub-development
-      gkeProject: hubnonprod
-      gkeLocation: asia-south1-a
-      gcpCredsFile: /opt/gcp/gcp-creds.json
-
+      ${{ if eq(variables['Build.SourceBranchName'], 'staging') }}:
+        gkeCluster: hub-staging
+        gkeProject: hubnonprod
+        gkeLocation: asia-south1-a
+        gcpCredsFile: /opt/gcp/gcp-creds.json
+        manifestDir: staging
+      ${{ if eq(variables['Build.SourceBranchName'], 'production') }}:
+        gkeCluster: hub-prod
+        gkeProject: hubprod-502013
+        gkeLocation: asia-south1 # regional cluster
+        gcpCredsFile: /opt/gcp/gcp-creds-prod.json
+        manifestDir: production
     jobs:
       - deployment: Deploy
         displayName: Deploy
         pool:
           name: $(poolName)
-        environment: development
+        ${{ if eq(variables['Build.SourceBranchName'], 'staging') }}:
+          environment: staging
+        ${{ if eq(variables['Build.SourceBranchName'], 'production') }}:
+          environment: production
         strategy:
           runOnce:
             deploy:
               steps:
                 - template: /pipeline-templates/deploy-superset-steps.yml
                   parameters:
-                    manifestDir: development
-                    cluster: $(gkeCluster)
-                    project: $(gkeProject)
-                    location: $(gkeLocation)
-                    credsFile: $(gcpCredsFile)
-
-  - stage: Staging
-    condition: and(succeeded(), eq(variables['build.SourceBranchName'], 'staging'))
-    displayName: Staging Deploy stage
-    dependsOn: Build
-    variables:
-      gkeCluster: hub-staging
-      gkeProject: hubnonprod
-      gkeLocation: asia-south1-a
-      gcpCredsFile: /opt/gcp/gcp-creds.json
-
-    jobs:
-      - deployment: Deploy
-        displayName: Deploy
-        pool:
-          name: $(poolName)
-        environment: staging
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - template: /pipeline-templates/deploy-superset-steps.yml
-                  parameters:
-                    manifestDir: staging
-                    cluster: $(gkeCluster)
-                    project: $(gkeProject)
-                    location: $(gkeLocation)
-                    credsFile: $(gcpCredsFile)
-
-  - stage: Production
-    condition: and(succeeded(), eq(variables['build.SourceBranchName'], 'production'))
-    displayName: Production Deploy stage
-    dependsOn: Build
-    variables:
-      gkeCluster: hub-prod
-      gkeProject: hubprod-502013
-      gkeLocation: asia-south1 # regional cluster
-      gcpCredsFile: /opt/gcp/gcp-creds-prod.json
-
-    jobs:
-      - deployment: Deploy
-        displayName: Deploy
-        pool:
-          name: $(poolName)
-        environment: production
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - template: /pipeline-templates/deploy-superset-steps.yml
-                  parameters:
-                    manifestDir: production
+                    manifestDir: $(manifestDir)
                     cluster: $(gkeCluster)
                     project: $(gkeProject)
                     location: $(gkeLocation)
