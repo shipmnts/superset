@@ -28,14 +28,12 @@
 #   The deploy stages only run kubectl, so the small disk does not affect them.
 
 trigger:
-  - staging
-  - production
-
-pr:
   branches:
-    exclude:
-      - "*"
-    include: []
+    include:
+      - staging
+      - master
+
+pr: none
 
 variables:
   imageRepository: "shipmnts/superset"
