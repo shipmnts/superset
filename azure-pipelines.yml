@@ -31,7 +31,7 @@ trigger:
   branches:
     include:
       - staging
-      - master
+      - production
 
 pr: none
 
