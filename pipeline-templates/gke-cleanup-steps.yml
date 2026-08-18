@@ -1,0 +1,24 @@
+# Revoke the GCP identity and delete the isolated gcloud/kubeconfig state that
+# gke-auth-steps.yml wrote for this job.
+#
+# Self-hosted agents reuse the same VM (and OS user) across unrelated jobs — they
+# do NOT get a fresh VM per job like Microsoft-hosted agents do. Without this
+# cleanup, a job's authenticated gcloud identity and live kubeconfig would sit on
+# disk after the job ends, discoverable by whatever job runs next on that same
+# agent. Append this as the LAST step of every deploy job that uses
+# gke-auth-steps.yml, so it still runs if earlier steps fail.
+#
+# Kept in sync with mono-operations/pipeline-templates/gke-cleanup-steps.yml.
+
+steps:
+  - bash: |
+      set -uo pipefail
+      if [ -n "${CLOUDSDK_CONFIG:-}" ]; then
+        gcloud auth revoke --all --quiet 2>/dev/null || true
+        rm -rf "$CLOUDSDK_CONFIG"
+      fi
+      if [ -n "${KUBECONFIG:-}" ]; then
+        rm -f "$KUBECONFIG"
+      fi
+    displayName: Revoke GCP credentials and clean up kubeconfig
+    condition: always()

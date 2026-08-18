@@ -7,7 +7,7 @@
 # (__tag__) rather than patched by the task's `containers:` input.
 
 parameters:
-  - name: manifestDir # development | staging | production
+  - name: manifestDir # staging | production
     type: string
   - name: cluster
     type: string
@@ -46,3 +46,5 @@ steps:
         kubectl -n ${{ parameters.namespace }} rollout status "$d" --timeout=600s
       done
     displayName: Deploy to Kubernetes
+
+  - template: gke-cleanup-steps.yml
