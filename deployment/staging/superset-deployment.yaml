@@ -24,13 +24,8 @@ spec:
             - secretRef:
                 name: superset-secret
           env:
-            # gunicorn kills any worker whose request exceeds --timeout, which
-            # defaults to 60s in the base image's run-server.sh. That killed
-            # chart queries at 60s regardless of SUPERSET_WEBSERVER_TIMEOUT
-            # (300), because the web server gave up before the browser did.
-            # Kept equal to SUPERSET_WEBSERVER_TIMEOUT so the two agree.
-            - name: GUNICORN_TIMEOUT
-              value: "300"
+            - name: SERVER_WORKER_AMOUNT
+              value: "4"
           imagePullPolicy: "Always"
 ---
 apiVersion: v1
