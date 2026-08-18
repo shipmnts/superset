@@ -16,8 +16,7 @@
 #
 x-superset-image: &superset-image apachesuperset.docker.scarf.sh/apache/superset:${TAG:-latest-dev}
 x-superset-user: &superset-user root
-x-superset-depends-on:
-  &superset-depends-on
+x-superset-depends-on: &superset-depends-on
   - db
   - redis
 x-superset-volumes:
@@ -28,8 +27,7 @@ x-superset-volumes:
   - ../superset-frontend:/app/superset-frontend
   - superset_home:/app/superset_home
 
-x-common-build:
-  &common-build
+x-common-build: &common-build
   context: .
   target: dev
   cache_from:
@@ -74,7 +72,7 @@ services:
     env_file: .env
     image: *superset-image
     container_name: superset_app
-    command: [ "/app/docker/docker-bootstrap.sh", "app" ]
+    command: ["/app/docker/docker-bootstrap.sh", "app"]
     restart: unless-stopped
     ports:
       - 8088:8088
@@ -85,6 +83,7 @@ services:
     volumes: *superset-volumes
     environment:
       CYPRESS_CONFIG: "${CYPRESS_CONFIG}"
+      SERVER_WORKER_AMOUNT: "4"
 
   superset-websocket:
     container_name: superset_websocket
@@ -119,7 +118,7 @@ services:
   superset-init:
     image: *superset-image
     container_name: superset_init
-    command: [ "/app/docker/docker-init.sh" ]
+    command: ["/app/docker/docker-init.sh"]
     env_file:
       - path: .env # default
         required: true
@@ -134,7 +133,7 @@ services:
   superset-worker:
     image: *superset-image
     container_name: superset_worker
-    command: [ "/app/docker/docker-bootstrap.sh", "worker" ]
+    command: ["/app/docker/docker-bootstrap.sh", "worker"]
     env_file:
       - path: .env # default
         required: true
@@ -150,7 +149,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "celery -A superset.tasks.celery_app:app inspect ping -d celery@$$HOSTNAME"
+          "celery -A superset.tasks.celery_app:app inspect ping -d celery@$$HOSTNAME",
         ]
     # Bump memory limit if processing selenium / thumbnails on superset-worker
     # mem_limit: 2038m
@@ -159,7 +158,7 @@ services:
   superset-worker-beat:
     image: *superset-image
     container_name: superset_worker_beat
-    command: [ "/app/docker/docker-bootstrap.sh", "beat" ]
+    command: ["/app/docker/docker-bootstrap.sh", "beat"]
     env_file:
       - path: .env # default
         required: true
