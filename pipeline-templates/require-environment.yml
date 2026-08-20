@@ -1,0 +1,20 @@
+# Guard against deploying without a valid Azure DevOps Environment bound to the job.
+#
+# Environment.Name is an Azure DevOps predefined variable populated ONLY when the
+# job actually resolved a real `environment:` key at compile time. If it's empty,
+# no valid environment was mapped for this branch/stage — fail immediately, before
+# any cluster auth, kubectl apply, or other deploy step runs.
+#
+# Kept in sync with mono-operations/pipeline-templates/require-environment.yml.
+# Include this as the FIRST step under every deployment job's `deploy:` steps.
+
+steps:
+  - bash: |
+      set -euo pipefail
+      env_name="$(Environment.Name)"
+      if [ -z "$env_name" ]; then
+        echo "##vso[task.logissue type=error]Refusing to deploy: no Azure DevOps Environment is bound to this job (Environment.Name is empty). Branch '$(Build.SourceBranchName)' likely doesn't match any environment-mapping condition in this pipeline's stages. Add the missing branch mapping — do not bypass this check."
+        exit 1
+      fi
+      echo "Deploying under Environment '$env_name' for branch '$(Build.SourceBranchName)'"
+    displayName: Require valid environment

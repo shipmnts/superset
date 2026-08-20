@@ -11,8 +11,8 @@
 #
 # Per-env superset_config.py / requirements-local.txt are baked into the image
 # at build time from deployment/$(deployEnv)/ via the BRANCH arg. deployEnv is
-# normally the branch name; see the `variables` block for the one branch where
-# the two differ.
+# normally the branch name; the 6.1.0 upgrade branch is the one case where the
+# two differ — see the `variables` block.
 #
 # AGENTS — the two stages deliberately run on different agents:
 #   Build   -> vmImage: ubuntu-latest  (Microsoft-hosted)
@@ -30,19 +30,16 @@
 #   The deploy stages only run kubectl, so the small disk does not affect them.
 
 trigger:
-  - development
-  - staging
-  - production
-  # Superset 6.1.0 upgrade branch. Deploys to the staging cluster alongside the
-  # 4.0.2 `staging` branch so 6.1.0 can be validated there before it becomes
-  # `staging`. Drop this entry once the upgrade is merged into `staging`.
-  - upgrade/superset-6.1.0-staging
-
-pr:
   branches:
-    exclude:
-      - "*"
-    include: []
+    include:
+      - staging
+      - production
+      # Superset 6.1.0 upgrade branch. Deploys to the staging cluster alongside
+      # the 4.0.2 `staging` branch so 6.1.0 can be validated there before it
+      # becomes `staging`. Remove once the upgrade is merged into `staging`.
+      - upgrade/superset-6.1.0-staging
+
+pr: none
 
 variables:
   imageRepository: "shipmnts/superset"
@@ -58,13 +55,11 @@ variables:
   poolName: "SelfHosted"
   DOCKER_BUILDKIT: 1
 
-  # Which deployment/<env>/ directory this build bakes into the image, and which
-  # cluster it deploys to. For development/staging/production the branch name IS
-  # the env, but the 6.1.0 upgrade branch resolves Build.SourceBranchName to
-  # `superset-6.1.0-staging` — not a directory under deployment/ — so map it back
-  # to `staging`. Matching on the full ref avoids colliding with a same-named
-  # branch under another prefix.
-  ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/upgrade/superset-6.1.0-staging') }}:
+  # Which deployment/<env>/ directory the Build stage bakes into the image. For
+  # staging/production the branch name IS the env, but the 6.1.0 upgrade branch
+  # resolves Build.SourceBranchName to `superset-6.1.0-staging`, which is not a
+  # directory under deployment/ — map it back to `staging`.
+  ${{ if eq(variables['Build.SourceBranchName'], 'superset-6.1.0-staging') }}:
     deployEnv: "staging"
   ${{ else }}:
     deployEnv: "$(Build.SourceBranchName)"
@@ -100,8 +95,8 @@ stages:
                 latest
                 $(tag)
                 $(Build.SourceBranchName)
-              # cache-from stays keyed on the branch name so each branch keeps its
-              # own cache lane; BRANCH selects the deployment/<env>/ config dir.
+              # cache-from stays keyed on the branch name so each branch keeps its own
+              # cache lane; BRANCH selects the deployment/<env>/ config dir.
               arguments: "--cache-from $(containerRegistry)/$(imageRepository):$(Build.SourceBranchName) --build-arg BUILDKIT_INLINE_CACHE=1 --build-arg BRANCH=$(deployEnv)"
 
           - task: Docker@2
@@ -116,94 +111,60 @@ stages:
           - upload: deployment
             artifact: deployment
 
-  - stage: Development
-    condition: and(succeeded(), eq(variables['build.SourceBranchName'], 'development'))
-    displayName: Development Deploy stage
+  # ─────────────────────────────────────────────────────────────
+  # DEPLOY
+  # GKE target + manifest-dir variables are selected at queue time from the
+  # source branch. No development deploy — no hub-development cluster exists.
+  # To add a new environment: add its branch to trigger, a matching
+  # variables: block below, AND a matching environment: block on the job —
+  # all three must stay in sync.
+  # ─────────────────────────────────────────────────────────────
+  - stage: Deploy
+    displayName: Deploy stage
     dependsOn: Build
+    condition: |
+      and(
+        succeeded('Build'),
+        in(variables['Build.SourceBranchName'], 'staging', 'production', 'superset-6.1.0-staging')
+      )
     variables:
-      # NOTE: no hub-development cluster exists in GKE yet — add an entry to the
-      # environments map in mono-operations deployment/terraform/gcp/nonprod
-      # before pushing to the development branch, or this stage will fail on
-      # `get-credentials`.
-      gkeCluster: hub-development
-      gkeProject: hubnonprod
-      gkeLocation: asia-south1-a
-      gcpCredsFile: /opt/gcp/gcp-creds.json
-
+      ${{ if eq(variables['Build.SourceBranchName'], 'staging') }}:
+        gkeCluster: hub-staging
+        gkeProject: hubnonprod
+        gkeLocation: asia-south1-a
+        gcpCredsFile: /opt/gcp/gcp-creds.json
+        manifestDir: staging
+      # 6.1.0 upgrade branch deploys to the SAME staging cluster and manifests.
+      ${{ if eq(variables['Build.SourceBranchName'], 'superset-6.1.0-staging') }}:
+        gkeCluster: hub-staging
+        gkeProject: hubnonprod
+        gkeLocation: asia-south1-a
+        gcpCredsFile: /opt/gcp/gcp-creds.json
+        manifestDir: staging
+      ${{ if eq(variables['Build.SourceBranchName'], 'production') }}:
+        gkeCluster: hub-prod
+        gkeProject: hubprod-502013
+        gkeLocation: asia-south1 # regional cluster
+        gcpCredsFile: /opt/gcp/gcp-creds-prod.json
+        manifestDir: production
     jobs:
       - deployment: Deploy
         displayName: Deploy
         pool:
           name: $(poolName)
-        environment: development
+        ${{ if eq(variables['Build.SourceBranchName'], 'staging') }}:
+          environment: staging
+        ${{ if eq(variables['Build.SourceBranchName'], 'superset-6.1.0-staging') }}:
+          environment: staging
+        ${{ if eq(variables['Build.SourceBranchName'], 'production') }}:
+          environment: production
         strategy:
           runOnce:
             deploy:
               steps:
                 - template: /pipeline-templates/deploy-superset-steps.yml
                   parameters:
-                    manifestDir: development
-                    cluster: $(gkeCluster)
-                    project: $(gkeProject)
-                    location: $(gkeLocation)
-                    credsFile: $(gcpCredsFile)
-
-  - stage: Staging
-    # Two branches deploy here: `staging` (4.0.2) and the 6.1.0 upgrade branch.
-    # Both use deployment/staging/, so manifestDir below stays hardcoded.
-    condition: >-
-      and(succeeded(),
-          or(eq(variables['Build.SourceBranch'], 'refs/heads/staging'),
-             eq(variables['Build.SourceBranch'], 'refs/heads/upgrade/superset-6.1.0-staging')))
-    displayName: Staging Deploy stage
-    dependsOn: Build
-    variables:
-      gkeCluster: hub-staging
-      gkeProject: hubnonprod
-      gkeLocation: asia-south1-a
-      gcpCredsFile: /opt/gcp/gcp-creds.json
-
-    jobs:
-      - deployment: Deploy
-        displayName: Deploy
-        pool:
-          name: $(poolName)
-        environment: staging
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - template: /pipeline-templates/deploy-superset-steps.yml
-                  parameters:
-                    manifestDir: staging
-                    cluster: $(gkeCluster)
-                    project: $(gkeProject)
-                    location: $(gkeLocation)
-                    credsFile: $(gcpCredsFile)
-
-  - stage: Production
-    condition: and(succeeded(), eq(variables['build.SourceBranchName'], 'production'))
-    displayName: Production Deploy stage
-    dependsOn: Build
-    variables:
-      gkeCluster: hub-prod
-      gkeProject: hubprod-502013
-      gkeLocation: asia-south1 # regional cluster
-      gcpCredsFile: /opt/gcp/gcp-creds-prod.json
-
-    jobs:
-      - deployment: Deploy
-        displayName: Deploy
-        pool:
-          name: $(poolName)
-        environment: production
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - template: /pipeline-templates/deploy-superset-steps.yml
-                  parameters:
-                    manifestDir: production
+                    manifestDir: $(manifestDir)
                     cluster: $(gkeCluster)
                     project: $(gkeProject)
                     location: $(gkeLocation)

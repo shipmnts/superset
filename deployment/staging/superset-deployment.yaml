@@ -23,6 +23,9 @@ spec:
           envFrom:
             - secretRef:
                 name: superset-secret
+          env:
+            - name: SERVER_WORKER_AMOUNT
+              value: "4"
           imagePullPolicy: "Always"
 ---
 apiVersion: v1

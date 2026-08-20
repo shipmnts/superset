@@ -50,6 +50,7 @@ import { updateDataMask } from 'src/dataMask/actions';
 import { waitForAsyncData } from 'src/middleware/asyncEvent';
 import { ensureAppRoot } from 'src/utils/pathUtils';
 import { safeStringify } from 'src/utils/safeStringify';
+import { createConcurrencyLimiter } from 'src/utils/concurrencyLimit';
 import { extendedDayjs } from '@superset-ui/core/utils/dates';
 import type { Dispatch, Action, AnyAction } from 'redux';
 import type { ThunkAction, ThunkDispatch } from 'redux-thunk';
@@ -64,6 +65,7 @@ export interface ChartsState {
 export interface CommonState {
   conf: {
     SUPERSET_WEBSERVER_TIMEOUT?: number;
+    DASHBOARD_MAX_CONCURRENT_CHART_REQUESTS?: number;
     [key: string]: unknown;
   };
 }
@@ -91,6 +93,35 @@ export interface RootState {
     common?: { conf: { DEFAULT_VIZ_TYPE?: string } };
     [key: string]: unknown;
   };
+}
+
+// Cap concurrent chart data requests so a dashboard with many charts does not
+// open dozens of simultaneous queries. The limit comes from the backend config
+// key DASHBOARD_MAX_CONCURRENT_CHART_REQUESTS (superset/config.py), surfaced to
+// the frontend through FRONTEND_CONF_KEYS.
+export const DEFAULT_MAX_CONCURRENT_CHART_REQUESTS = 5;
+
+let chartRequestLimiter:
+  | ReturnType<typeof createConcurrencyLimiter>
+  | undefined;
+
+export function runWithChartRequestLimit<T>(
+  getState: () => RootState,
+  task: () => Promise<T>,
+): Promise<T> {
+  if (!chartRequestLimiter) {
+    const configured =
+      getState()?.common?.conf?.DASHBOARD_MAX_CONCURRENT_CHART_REQUESTS;
+    chartRequestLimiter = createConcurrencyLimiter(
+      configured ?? DEFAULT_MAX_CONCURRENT_CHART_REQUESTS,
+    );
+  }
+  return chartRequestLimiter(task);
+}
+
+// Exported for tests: the limiter is module state and must not leak between them.
+export function resetChartRequestLimiter(): void {
+  chartRequestLimiter = undefined;
 }
 
 // Action types
@@ -764,16 +795,18 @@ export function exploreJSON(
       setTimeout(() => prevController.abort(), 0);
     }
 
-    const chartDataRequest = getChartDataRequest({
-      setDataMask,
-      formData,
-      resultFormat: 'json',
-      resultType: 'full',
-      force,
-      method: 'POST',
-      requestParams,
-      ownState,
-    });
+    const chartDataRequest = runWithChartRequestLimit(getState, () =>
+      getChartDataRequest({
+        setDataMask,
+        formData,
+        resultFormat: 'json',
+        resultType: 'full',
+        force,
+        method: 'POST',
+        requestParams,
+        ownState,
+      }),
+    );
 
     const [useLegacyApi] = getQuerySettings(formData);
     const chartDataRequestCaught = chartDataRequest
