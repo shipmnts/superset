@@ -1,3 +1,4 @@
 psycopg2-binary
+mysqlclient==2.2.6
 flask_cors
 prophet
