@@ -34,10 +34,6 @@ trigger:
     include:
       - staging
       - production
-      # Superset 6.1.0 upgrade branch. Deploys to the staging cluster alongside
-      # the 4.0.2 `staging` branch so 6.1.0 can be validated there before it
-      # becomes `staging`. Remove once the upgrade is merged into `staging`.
-      - upgrade/superset-6.1.0-staging
 
 pr: none
 
@@ -125,17 +121,10 @@ stages:
     condition: |
       and(
         succeeded('Build'),
-        in(variables['Build.SourceBranchName'], 'staging', 'production', 'superset-6.1.0-staging')
+        in(variables['Build.SourceBranchName'], 'staging', 'production')
       )
     variables:
       ${{ if eq(variables['Build.SourceBranchName'], 'staging') }}:
-        gkeCluster: hub-staging
-        gkeProject: hubnonprod
-        gkeLocation: asia-south1-a
-        gcpCredsFile: /opt/gcp/gcp-creds.json
-        manifestDir: staging
-      # 6.1.0 upgrade branch deploys to the SAME staging cluster and manifests.
-      ${{ if eq(variables['Build.SourceBranchName'], 'superset-6.1.0-staging') }}:
         gkeCluster: hub-staging
         gkeProject: hubnonprod
         gkeLocation: asia-south1-a
@@ -153,8 +142,6 @@ stages:
         pool:
           name: $(poolName)
         ${{ if eq(variables['Build.SourceBranchName'], 'staging') }}:
-          environment: staging
-        ${{ if eq(variables['Build.SourceBranchName'], 'superset-6.1.0-staging') }}:
           environment: staging
         ${{ if eq(variables['Build.SourceBranchName'], 'production') }}:
           environment: production

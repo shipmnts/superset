@@ -188,9 +188,6 @@ DEFAULT_TIME_FILTER = utils.NO_TIME_RANGE
 # (gunicorn, nginx, apache, ...) timeout setting to be <= to this setting
 SUPERSET_WEBSERVER_TIMEOUT = int(timedelta(minutes=1).total_seconds())
 
-# Fork setting: cap how many chart data requests a dashboard fires at once.
-# Exposed to the frontend via FRONTEND_CONF_KEYS and consumed by
-# runWithChartRequestLimit in superset-frontend/src/components/Chart/chartAction.ts.
 DASHBOARD_MAX_CONCURRENT_CHART_REQUESTS = 4
 
 # this 2 settings are used by dashboard period force refresh feature

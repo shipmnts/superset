@@ -84,6 +84,7 @@ services:
     volumes: *superset-volumes
     environment:
       CYPRESS_CONFIG: "${CYPRESS_CONFIG}"
+      SERVER_WORKER_AMOUNT: "4"
 
   # MCP service: lets AI clients (Claude Desktop/Code, ChatGPT, ...) talk to
   # Superset (list datasets, run SQL, create charts/dashboards). Client config:
