@@ -27,8 +27,15 @@ WORKDIR ${SUPERSET_HOME}/superset-frontend
 COPY --chown=superset:superset superset-frontend/package.json superset-frontend/package-lock.json ./
 COPY --chown=superset:superset --parents superset-frontend/plugins/*/package.json superset-frontend/plugins/*/package-lock.json  ../
 COPY --chown=superset:superset --parents superset-frontend/packages/*/package.json superset-frontend/packages/*/package-lock.json  ../
-USER superset
 
+# The frontend build stays as root. In apache/superset:6.1.0 both
+# /app/superset-frontend and /app/superset/static/assets are root:root 755, and
+# the --chown flags above only set ownership on the copied files, not on the
+# containing directory. Running npm as the superset user therefore fails with
+# EACCES trying to mkdir node_modules (and again writing the build output). The
+# 4.0.2 image built the frontend in a separate node stage, also as root; the
+# final USER superset at the end of this file is what matters for runtime.
+#
 # Lockfile is consistent on 6.1.0 (swimlane react peer handled via package.json
 # overrides), so use the reproducible npm ci instead of the old `install --force`.
 RUN npm ci

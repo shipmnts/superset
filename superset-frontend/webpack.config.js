@@ -106,7 +106,7 @@ const plugins = [
     ...(isDevMode ? { Buffer: ['buffer', 'Buffer'] } : {}), // Fix legacy-plugin-chart-paired-t-test broken Story
   }),
 
-  // The precompiled `shipmnts-swimlane` package targets the 4.x `@superset-ui/core`
+  // The precompiled `@shipmnts/swimlane` package targets the 4.x `@superset-ui/core`
   // API, where `t`/translation were exported from the core root. 6.1.0 moved them
   // to `@apache-superset/core/translation` (PR #36929), so swimlane's module-scope
   // `t()` crashes app init. Redirect ONLY swimlane's `@superset-ui/core` imports to
@@ -117,7 +117,7 @@ const plugins = [
       if (
         resource.context &&
         resource.context.includes(
-          `${path.sep}node_modules${path.sep}shipmnts-swimlane`,
+          `${path.sep}node_modules${path.sep}@shipmnts${path.sep}swimlane`,
         )
       ) {
         resource.request = path.resolve(
