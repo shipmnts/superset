@@ -49,6 +49,16 @@ USER root
 ARG BRANCH
 COPY ./superset ${SUPERSET_HOME}/superset
 COPY ./deployment/${BRANCH}/requirements-local.txt /app/
-RUN pip install -r /app/requirements-local.txt
+# Install into the app's virtualenv, NOT the system interpreter. apache/superset
+# 6.1.0 runs from a uv-managed venv at /app/.venv, and `uv venv` does not place a
+# `pip` inside it -- so a bare `pip install` falls through PATH to
+# /usr/local/bin/pip and lands in /usr/local/lib/python3.10/site-packages, which
+# the app never imports from. The 4.0.2 base image had no venv, so the old
+# `pip install` worked by accident. Symptom when this is wrong: the pod boots and
+# dies with ModuleNotFoundError: No module named 'psycopg2'.
+#
+# psycopg2 is genuinely absent from the published image: upstream installs the
+# [postgres] extra only in its `dev`/`ci` stages, and the released tag is `lean`.
+RUN uv pip install --python /app/.venv/bin/python --no-cache -r /app/requirements-local.txt
 COPY ./deployment/${BRANCH}/superset-config.py /app/pythonpath/superset_config.py
 USER superset
