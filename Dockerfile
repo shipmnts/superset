@@ -1,11 +1,30 @@
 # syntax=docker/dockerfile:1.7-labs
 
+FROM node:22-bookworm-slim AS frontend-builder
+ENV NODE_OPTIONS="--max-old-space-size=8192"
+ENV CYPRESS_INSTALL_BINARY=0
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends python3 build-essential zstd && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app/superset-frontend
+COPY superset-frontend/package.json superset-frontend/package-lock.json ./
+COPY --parents superset-frontend/plugins/*/package.json superset-frontend/plugins/*/package-lock.json  ../
+COPY --parents superset-frontend/packages/*/package.json superset-frontend/packages/*/package-lock.json  ../
+
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm ci
+
+WORKDIR /app
+COPY superset-frontend ./superset-frontend
+WORKDIR /app/superset-frontend
+# webpack writes to ../superset/static/assets -> /app/superset/static/assets
+RUN npm run build
+
+
 FROM apache/superset:6.1.0
 ENV SUPERSET_HOME=/app
 ENV TEMP_DIR=/app/temp-superset
-ENV BUILD_SUPERSET_FRONTEND_IN_DOCKER=true
-ENV NODE_OPTIONS="--max-old-space-size=8192"
-# Install Node.js and npm
 USER root
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -16,40 +35,17 @@ RUN apt-get update && \
     build-essential \
     python3 \
     zstd \
-    curl git \
-    gnupg && \
-    curl -sL https://deb.nodesource.com/setup_22.x | bash - && \
-    apt-get install -y nodejs
+    curl git && \
+    rm -rf /var/lib/apt/lists/*
 
-
-
-WORKDIR ${SUPERSET_HOME}/superset-frontend
-COPY --chown=superset:superset superset-frontend/package.json superset-frontend/package-lock.json ./
-COPY --chown=superset:superset --parents superset-frontend/plugins/*/package.json superset-frontend/plugins/*/package-lock.json  ../
-COPY --chown=superset:superset --parents superset-frontend/packages/*/package.json superset-frontend/packages/*/package-lock.json  ../
-
-# The frontend build stays as root. In apache/superset:6.1.0 both
-# /app/superset-frontend and /app/superset/static/assets are root:root 755, and
-# the --chown flags above only set ownership on the copied files, not on the
-# containing directory. Running npm as the superset user therefore fails with
-# EACCES trying to mkdir node_modules (and again writing the build output). The
-# 4.0.2 image built the frontend in a separate node stage, also as root; the
-# final USER superset at the end of this file is what matters for runtime.
-#
-# Lockfile is consistent on 6.1.0 (swimlane react peer handled via package.json
-# overrides), so use the reproducible npm ci instead of the old `install --force`.
-RUN npm ci
-
-WORKDIR ${SUPERSET_HOME}
-COPY superset-frontend ./superset-frontend
-WORKDIR ${SUPERSET_HOME}/superset-frontend
-RUN npm run build
-
-USER root
 ARG BRANCH
 COPY ./superset ${SUPERSET_HOME}/superset
+COPY --from=frontend-builder --chown=superset:superset /app/superset/static/assets ${SUPERSET_HOME}/superset/static/assets
 COPY ./deployment/${BRANCH}/requirements-local.txt /app/
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -r /app/requirements-local.txt
+# Must be `uv pip install`, not `pip install`: 6.1.0 serves from a uv venv at
+# /app/.venv which contains no pip, so bare `pip` installs into the system
+# interpreter and the pod dies with ModuleNotFoundError: No module named 'psycopg2'.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --python /app/.venv/bin/python -r /app/requirements-local.txt
 COPY ./deployment/${BRANCH}/superset-config.py /app/pythonpath/superset_config.py
 USER superset
