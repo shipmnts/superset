@@ -89,7 +89,7 @@ import { ChartCustomizationPlugins, FilterPlugins } from 'src/constants';
 import AgGridTableChartPlugin from '@superset-ui/plugin-chart-ag-grid-table';
 import TimeTableChartPlugin from '../TimeTable';
 // eslint-disable-next-line import/no-extraneous-dependencies, import/no-unresolved
-import { Swimlane } from 'shipmnts-swimlane';
+import { Swimlane } from '@shipmnts/swimlane';
 
 export default class MainPreset extends Preset {
   constructor() {
