@@ -14,12 +14,12 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+# pylint: disable=consider-using-transaction
 from __future__ import annotations
 
 import enum
 from typing import TYPE_CHECKING
 
-from flask import escape
 from flask_appbuilder import Model
 from sqlalchemy import (
     Column,
@@ -36,6 +36,7 @@ from sqlalchemy.engine.base import Connection
 from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy.orm.mapper import Mapper
 from sqlalchemy.schema import UniqueConstraint
+from superset_core.common.models import Tag as CoreTag
 
 from superset import security_manager
 from superset.models.helpers import AuditMixinNullable
@@ -64,7 +65,7 @@ class TagType(enum.Enum):
     Objects (queries, charts, dashboards, and datasets) will have with implicit tags based
     on metadata: types, owners and who favorited them. This way, user "alice"
     can find all their objects by querying for the tag `owner:alice`.
-    """
+    """  # noqa: E501
 
     # pylint: disable=invalid-name
     # explicit tags, added manually by the owner
@@ -86,8 +87,7 @@ class ObjectType(enum.Enum):
     dataset = 4
 
 
-class Tag(Model, AuditMixinNullable):
-
+class Tag(CoreTag, AuditMixinNullable):
     """A tag attached to an object (query, chart, dashboard, or dataset)."""
 
     __tablename__ = "tag"
@@ -106,7 +106,6 @@ class Tag(Model, AuditMixinNullable):
 
 
 class TaggedObject(Model, AuditMixinNullable):
-
     """An association between an object and a tag."""
 
     __tablename__ = "tagged_object"
@@ -132,12 +131,14 @@ class TaggedObject(Model, AuditMixinNullable):
 
 
 def get_tag(
-    name: str, session: orm.Session, type_: TagType  # pylint: disable=disallowed-name
+    name: str,
+    session: orm.Session,  # pylint: disable=disallowed-name
+    type_: TagType,
 ) -> Tag:
     tag_name = name.strip()
     tag = session.query(Tag).filter_by(name=tag_name, type=type_).one_or_none()
     if tag is None:
-        tag = Tag(name=escape(tag_name), type=type_)
+        tag = Tag(name=tag_name, type=type_)
         session.add(tag)
         session.commit()
     return tag

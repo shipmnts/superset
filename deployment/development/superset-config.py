@@ -47,13 +47,18 @@ FEATURE_FLAGS = {
     "EMBEDDED_SUPERSET": True,
     "ENABLE_TEMPLATE_PROCESSING": True,
     "DRILL_TO_DETAIL": True,
-    "ADHOC_DASHBOARD_NATIVE_FILTERS": True,
+    # ADHOC_DASHBOARD_NATIVE_FILTERS removed: flag no longer exists in 6.x
+    # (adhoc dashboard native filters are standard behavior).
     "CHART_PLUGINS_EXPERIMENTAL": True,
     "DASHBOARD_VIRTUALIZATION": False
 }
 
 ALERT_REPORTS_NOTIFICATION_DRY_RUN = True
 SQLLAB_CTAS_NO_LIMIT = True
+
+# Fork override (was a core patch on 4.0.2; config-only since 6.1.0 upgrade):
+# large dashboards exceed the default position-data size limit.
+SUPERSET_DASHBOARD_POSITION_DATA_LIMIT = 85535
 # ------------------ Embedded Configurations --------------------
 
 BASE_URL = os.getenv('SUPERSET_URL')

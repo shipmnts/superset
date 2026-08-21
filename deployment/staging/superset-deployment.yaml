@@ -42,3 +42,53 @@ spec:
       port: 8088
       targetPort: 8088
       nodePort: 30080
+---
+# ---------------- MCP service (AI integration) ----------------
+# Runs the Superset MCP server (`superset mcp run`) as its own deployment so it
+# restarts/scales independently of the web pods. Same image + secret as the app.
+# REVIEW NOTE (senior dev): the MCP process binds :5008 in the pod; the internal
+# ClusterIP Service exposes it on port 80 (-> targetPort 5008). Add an ingress
+# route to /mcp deliberately, and prefer JWT auth before any public exposure —
+# see deployment/staging/superset-config.py.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: superset-mcp
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: superset-mcp
+  template:
+    metadata:
+      labels:
+        app: superset-mcp
+    spec:
+      imagePullSecrets:
+        - name: acr-pull
+      containers:
+        - name: superset-mcp
+          image: shipmnts.azurecr.io/shipmnts/superset:__tag__
+          command: ["superset"]
+          args: ["mcp", "run", "--host", "0.0.0.0", "--port", "5008"]
+          ports:
+            - containerPort: 5008
+          envFrom:
+            - secretRef:
+                name: superset-secret
+          imagePullPolicy: "Always"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: superset-mcp-service
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app: superset-mcp
+  ports:
+    - name: mcp
+      port: 80
+      targetPort: 5008

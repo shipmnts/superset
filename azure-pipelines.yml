@@ -10,7 +10,9 @@
 # instead of being patched by KubernetesManifest@0.
 #
 # Per-env superset_config.py / requirements-local.txt are baked into the image
-# at build time from deployment/$(Build.SourceBranchName)/ via the BRANCH arg.
+# at build time from deployment/$(deployEnv)/ via the BRANCH arg. deployEnv is
+# normally the branch name; the 6.1.0 upgrade branch is the one case where the
+# two differ — see the `variables` block.
 #
 # AGENTS — the two stages deliberately run on different agents:
 #   Build   -> vmImage: ubuntu-latest  (Microsoft-hosted)
@@ -49,6 +51,15 @@ variables:
   poolName: "SelfHosted"
   DOCKER_BUILDKIT: 1
 
+  # Which deployment/<env>/ directory the Build stage bakes into the image. For
+  # staging/production the branch name IS the env, but the 6.1.0 upgrade branch
+  # resolves Build.SourceBranchName to `superset-6.1.0-staging`, which is not a
+  # directory under deployment/ — map it back to `staging`.
+  ${{ if eq(variables['Build.SourceBranchName'], 'superset-6.1.0-staging') }}:
+    deployEnv: "staging"
+  ${{ else }}:
+    deployEnv: "$(Build.SourceBranchName)"
+
 stages:
   - stage: Build
     displayName: Build stage
@@ -80,7 +91,9 @@ stages:
                 latest
                 $(tag)
                 $(Build.SourceBranchName)
-              arguments: "--cache-from $(containerRegistry)/$(imageRepository):$(Build.SourceBranchName) --build-arg BUILDKIT_INLINE_CACHE=1 --build-arg BRANCH=$(Build.SourceBranchName)"
+              # cache-from stays keyed on the branch name so each branch keeps its own
+              # cache lane; BRANCH selects the deployment/<env>/ config dir.
+              arguments: "--cache-from $(containerRegistry)/$(imageRepository):$(Build.SourceBranchName) --build-arg BUILDKIT_INLINE_CACHE=1 --build-arg BRANCH=$(deployEnv)"
 
           - task: Docker@2
             displayName: push image to container registry

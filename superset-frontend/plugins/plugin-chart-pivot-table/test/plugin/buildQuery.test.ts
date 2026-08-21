@@ -36,6 +36,7 @@ const formData: PivotTableQueryFormData = {
   colSubTotals: true,
   rowTotals: true,
   rowSubTotals: true,
+  expandCollapse: false,
   valueFormat: 'SMART_NUMBER',
   datasource: '5__table',
   viz_type: 'my_chart',

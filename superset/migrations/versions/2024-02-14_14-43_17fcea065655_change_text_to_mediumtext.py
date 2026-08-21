@@ -26,13 +26,13 @@ Create Date: 2024-02-14 14:43:39.898093
 revision = "17fcea065655"
 down_revision = "87d38ad83218"
 
-import sqlalchemy as sa
-from alembic import op
-from sqlalchemy.dialects.mysql import MEDIUMTEXT, TEXT
-from sqlalchemy.dialects.mysql.base import MySQLDialect
+import sqlalchemy as sa  # noqa: E402
+from alembic import op  # noqa: E402
+from sqlalchemy.dialects.mysql import MEDIUMTEXT, TEXT  # noqa: E402
+from sqlalchemy.dialects.mysql.base import MySQLDialect  # noqa: E402
 
-from superset.migrations.shared.utils import get_table_column
-from superset.utils.core import MediumText
+from superset.migrations.shared.utils import get_table_column  # noqa: E402
+from superset.utils.core import MediumText  # noqa: E402
 
 TABLE_COLUMNS = [
     "annotation.json_metadata",

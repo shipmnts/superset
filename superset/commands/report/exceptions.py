@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import math
+
 from flask_babel import lazy_gettext as _
 
 from superset.commands.exceptions import (
@@ -35,6 +37,18 @@ class DatabaseNotFoundValidationError(ValidationError):
 
     def __init__(self) -> None:
         super().__init__(_("Database does not exist"), field_name="database")
+
+
+class ReportScheduleDatabaseNotAllowedValidationError(ValidationError):
+    """
+    Marshmallow validation error for database reference on a Report type schedule
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            _("Database reference is not allowed on a report"),
+            field_name="database",
+        )
 
 
 class DashboardNotFoundValidationError(ValidationError):
@@ -93,6 +107,31 @@ class ReportScheduleEitherChartOrDashboardError(ValidationError):
         )
 
 
+class ReportScheduleFrequencyNotAllowed(ValidationError):  # noqa: N818
+    """
+    Marshmallow validation error for report schedule configured to run more
+    frequently than allowed
+    """
+
+    def __init__(
+        self,
+        report_type: str = "Report",
+        minimum_interval: int = 120,
+    ) -> None:
+        interval_in_minutes = math.ceil(minimum_interval / 60)
+
+        super().__init__(
+            _(
+                "%(report_type)s schedule frequency exceeding limit."
+                " Please configure a schedule with a minimum interval of"
+                " %(minimum_interval)d minutes per execution.",
+                report_type=report_type,
+                minimum_interval=interval_in_minutes,
+            ),
+            field_name="crontab",
+        )
+
+
 class ChartNotSavedValidationError(ValidationError):
     """
     Marshmallow validation error for charts that haven't been saved yet
@@ -113,7 +152,7 @@ class DashboardNotSavedValidationError(ValidationError):
     def __init__(self) -> None:
         super().__init__(
             _(
-                "Please save your dashboard first, then try creating a new email report."
+                "Please save your dashboard first, then try creating a new email report."  # noqa: E501
             ),
             field_name="dashboard",
         )
@@ -147,6 +186,10 @@ class PruneReportScheduleLogFailedError(CommandException):
 
 class ReportScheduleScreenshotFailedError(CommandException):
     message = _("Report Schedule execution failed when generating a screenshot.")
+
+
+class ReportSchedulePdfFailedError(CommandException):
+    message = _("Report Schedule execution failed when generating a pdf.")
 
 
 class ReportScheduleCsvFailedError(CommandException):
@@ -278,3 +321,18 @@ class ReportScheduleForbiddenError(ForbiddenError):
 
 class ReportSchedulePruneLogError(CommandException):
     message = _("An error occurred while pruning logs ")
+
+
+class ReportScheduleUserEmailNotFoundError(ValidationError):
+    """
+    Validation error when user email is required but not found
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            _(
+                "Unable to create report: User email address is required but not "
+                "found. Please ensure your user profile has a valid email address."
+            ),
+            field_name="recipients",
+        )
