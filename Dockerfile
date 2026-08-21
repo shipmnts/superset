@@ -49,6 +49,7 @@ USER root
 ARG BRANCH
 COPY ./superset ${SUPERSET_HOME}/superset
 COPY ./deployment/${BRANCH}/requirements-local.txt /app/
-RUN uv pip install --python /app/.venv/bin/python --no-cache -r /app/requirements-local.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r /app/requirements-local.txt
 COPY ./deployment/${BRANCH}/superset-config.py /app/pythonpath/superset_config.py
 USER superset
