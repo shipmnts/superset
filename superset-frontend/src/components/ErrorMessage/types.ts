@@ -33,6 +33,7 @@ export type ErrorMessageComponent = ComponentType<ErrorMessageComponentProps>;
 
 export interface ErrorAlertProps {
   errorType?: string; // Strong text on the first line
+  source?: ErrorSource; // Where the alert is rendered; 'dashboard' moves the details into a modal
   message: React.ReactNode | string; // Text shown on the first line
   type?: 'warning' | 'error' | 'info'; // Allows only 'warning' or 'error'
   description?: React.ReactNode; // Text shown under the first line, not collapsible

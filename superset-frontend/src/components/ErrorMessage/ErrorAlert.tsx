@@ -16,22 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { t } from '@apache-superset/core/translation';
 import { Alert } from '@apache-superset/core/components';
 import { useTheme } from '@apache-superset/core/theme';
 import {
+  Button,
   Icons,
   Modal,
   Tooltip,
   Typography,
 } from '@superset-ui/core/components';
+import copyTextToClipboard from 'src/utils/copy';
 import type { ErrorAlertProps } from './types';
 
 export const ErrorAlert: React.FC<ErrorAlertProps> = ({
   errorType = t('Error'),
   message,
   type = 'error',
+  source,
   description,
   descriptionDetails,
   descriptionDetailsCollapsed = true,
@@ -47,6 +50,21 @@ export const ErrorAlert: React.FC<ErrorAlertProps> = ({
     !descriptionDetailsCollapsed,
   );
   const [showModal, setShowModal] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const modalBodyRef = useRef<HTMLDivElement>(null);
+
+  const detailsInModal = source === 'dashboard' && !!descriptionDetails;
+
+  const closeModal = () => {
+    setShowModal(false);
+    setCopied(false);
+  };
+
+  const copyModalBody = () => {
+    copyTextToClipboard(() =>
+      Promise.resolve(modalBodyRef.current?.innerText ?? ''),
+    ).then(() => setCopied(true));
+  };
 
   const toggleDescription = () => {
     setIsDescriptionVisible(!isDescriptionVisible);
@@ -74,7 +92,7 @@ export const ErrorAlert: React.FC<ErrorAlertProps> = ({
     fontFamily: theme.fontFamilyCode,
     margin: `${theme.sizeUnit}px 0`,
   };
-  const renderDescription = () => (
+  const renderDescription = (forceExpanded = false) => (
     <div>
       {message &&
         (messagePre ? (
@@ -94,28 +112,30 @@ export const ErrorAlert: React.FC<ErrorAlertProps> = ({
       )}
       {descriptionDetails && (
         <div>
-          {isDescriptionVisible && (
+          {(forceExpanded || isDescriptionVisible) && (
             <Typography.Paragraph style={descriptionPre ? preStyle : {}}>
               {descriptionDetails}
             </Typography.Paragraph>
           )}
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={toggleDescription}
-            style={{ textDecoration: 'underline', cursor: 'pointer' }}
-          >
-            {isDescriptionVisible ? t('See less') : t('See more')}
-          </span>
+          {!forceExpanded && (
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={toggleDescription}
+              style={{ textDecoration: 'underline', cursor: 'pointer' }}
+            >
+              {isDescriptionVisible ? t('See less') : t('See more')}
+            </span>
+          )}
         </div>
       )}
       {children}
     </div>
   );
-  const renderAlert = (closable: boolean) => (
+  const renderAlert = (closable: boolean, forceExpanded = false) => (
     <Alert
       message={errorType}
-      description={renderDescription()}
+      description={renderDescription(forceExpanded)}
       type={type}
       showIcon={showIcon}
       closable={closable}
@@ -139,6 +159,46 @@ export const ErrorAlert: React.FC<ErrorAlertProps> = ({
           footer={null}
         >
           {renderAlert(false)}
+        </Modal>
+      </>
+    );
+  }
+
+  if (detailsInModal) {
+    return (
+      <>
+        <Alert
+          message={errorType}
+          type={type}
+          showIcon={showIcon}
+          closable={closable}
+          className={className}
+          action={
+            <Typography.Link
+              onClick={() => setShowModal(true)}
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              {t('See more')}
+            </Typography.Link>
+          }
+        />
+        <Modal
+          name={errorType}
+          title={errorType}
+          show={showModal}
+          onHide={closeModal}
+          footer={
+            <>
+              <Button onClick={copyModalBody}>
+                {copied ? t('Copied') : t('Copy message')}
+              </Button>
+              <Button buttonStyle="primary" onClick={closeModal}>
+                {t('Close')}
+              </Button>
+            </>
+          }
+        >
+          <div ref={modalBodyRef}>{renderAlert(false, true)}</div>
         </Modal>
       </>
     );
