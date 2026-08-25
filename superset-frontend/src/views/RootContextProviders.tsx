@@ -18,6 +18,7 @@
  */
 
 import { getExtensionsRegistry } from '@superset-ui/core';
+import { ThemeMode } from '@apache-superset/core/theme';
 import { Provider as ReduxProvider } from 'react-redux';
 import { QueryParamProvider } from 'use-query-params';
 import { ReactRouter5Adapter } from 'use-query-params/adapters/react-router-5';
@@ -31,7 +32,9 @@ import { store } from './store';
 import '../preamble';
 import querystring from 'query-string';
 
-const themeController = new ThemeController();
+const themeController = new ThemeController({
+  initialMode: ThemeMode.DEFAULT,
+});
 const extensionsRegistry = getExtensionsRegistry();
 
 export const RootContextProviders: React.FC = ({ children }) => {
