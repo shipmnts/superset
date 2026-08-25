@@ -17,8 +17,7 @@
  * under the License.
  */
 import { ReactNode } from 'react';
-import { t } from '@apache-superset/core/translation';
-import { tn } from '@apache-superset/core/translation';
+import { t, tn } from '@apache-superset/core/translation';
 
 import type { ErrorMessageComponentProps } from './types';
 import { IssueCode } from './IssueCode';
@@ -103,6 +102,7 @@ export function DatabaseErrorMessage({
       description={alertDescription}
       type={level}
       descriptionDetails={body}
+      source={source}
       closable={closable}
     />
   );

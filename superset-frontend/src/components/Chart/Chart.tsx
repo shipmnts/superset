@@ -167,23 +167,15 @@ const Styles = styled.div<{ height: number; width?: number }>`
 
 const LoadingDiv = styled.div`
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 80%;
-  transform: translate(-50%, -50%);
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 `;
 
 const ErrorContainer = styled.div<{ height: number }>`
   height: ${p => p.height}px;
   overflow: auto;
-`;
-
-const MessageSpan = styled.span`
-  display: block;
-  text-align: center;
-  margin: ${({ theme }) => theme.sizeUnit * 4}px auto;
-  width: fit-content;
-  color: ${({ theme }) => theme.colorText};
 `;
 
 class Chart extends PureComponent<ChartProps, {}> {
@@ -309,11 +301,7 @@ class Chart extends PureComponent<ChartProps, {}> {
     );
   }
 
-  renderSpinner(databaseName: string | undefined) {
-    const message = databaseName
-      ? t('Waiting on %s', databaseName)
-      : t('Waiting on database...');
-
+  renderSpinner() {
     return (
       <LoadingDiv>
         <Loading
@@ -321,7 +309,6 @@ class Chart extends PureComponent<ChartProps, {}> {
           size={this.props.dashboardId ? 's' : 'm'}
           muted={!!this.props.dashboardId}
         />
-        <MessageSpan>{message}</MessageSpan>
       </LoadingDiv>
     );
   }
@@ -354,14 +341,11 @@ class Chart extends PureComponent<ChartProps, {}> {
       height,
       chartAlert,
       chartStatus,
-      datasource,
       errorMessage,
       chartIsStale,
       queriesResponse = [],
       width,
     } = this.props;
-
-    const databaseName = datasource?.database?.name as string | undefined;
 
     const isLoading = chartStatus === 'loading';
     // Suppress spinner during auto-refresh to avoid visual flicker
@@ -426,9 +410,7 @@ class Chart extends PureComponent<ChartProps, {}> {
           height={height}
           width={width}
         >
-          {showSpinner
-            ? this.renderSpinner(databaseName)
-            : this.renderChartContainer()}
+          {showSpinner ? this.renderSpinner() : this.renderChartContainer()}
         </Styles>
       </ErrorBoundary>
     );

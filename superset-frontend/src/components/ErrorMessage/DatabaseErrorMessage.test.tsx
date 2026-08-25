@@ -166,6 +166,6 @@ test('should render message when wrong value provided for custom_doc_urls', () =
   render(<DatabaseErrorMessage {...mockedPropsWithCustomErrorAndBadLinks} />, {
     useRedux: true,
   });
-  const button = screen.queryByText('Error message');
-  expect(button).toBeInTheDocument();
+  userEvent.click(screen.getByText('See more'));
+  expect(screen.getByText('Error message')).toBeInTheDocument();
 });

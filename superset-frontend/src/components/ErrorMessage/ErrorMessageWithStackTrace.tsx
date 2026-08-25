@@ -101,6 +101,7 @@ export function ErrorMessageWithStackTrace({
       message={subtitle}
       description={description}
       descriptionDetails={computedDescriptionDetails}
+      source={source}
       compact={compact}
       closable={closable}
     />

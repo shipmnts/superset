@@ -16,28 +16,5 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import getOwnerName from './getOwnerName';
 
-test('render owner name correctly', () => {
-  expect(getOwnerName({ id: 1, first_name: 'Foo', last_name: 'Bar' })).toEqual(
-    'Foo Bar',
-  );
-
-  expect(getOwnerName({ id: 2, full_name: 'John Doe' })).toEqual('John Doe');
-});
-
-test('return empty string for undefined owner', () => {
-  expect(getOwnerName(undefined)).toEqual('');
-});
-
-test('return empty string when no name fields are set', () => {
-  expect(getOwnerName({ id: 1 })).toEqual('');
-});
-
-test('handle only first_name set', () => {
-  expect(getOwnerName({ id: 1, first_name: 'Foo' })).toEqual('Foo');
-});
-
-test('handle only last_name set', () => {
-  expect(getOwnerName({ id: 1, last_name: 'Bar' })).toEqual('Bar');
-});
+/// <reference types="@emotion/jest" />
