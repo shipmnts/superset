@@ -3,3 +3,4 @@ mysqlclient==2.2.6
 flask_cors
 prophet
 fastmcp>=3.1.0,<4.0
+clickhouse-connect>=0.13.0,<1.0

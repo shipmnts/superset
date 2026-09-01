@@ -2,3 +2,4 @@ psycopg2-binary
 mysqlclient==2.2.6
 flask_cors
 prophet
+clickhouse-connect>=0.13.0,<1.0
