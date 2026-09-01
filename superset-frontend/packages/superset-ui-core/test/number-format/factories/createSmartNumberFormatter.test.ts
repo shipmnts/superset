@@ -150,4 +150,81 @@ describe('createSmartNumberFormatter(options)', () => {
       });
     });
   });
+
+  describe('when tenant_country=IN, uses the Indian number format', () => {
+    const originalLocation = window.location;
+    let formatter: (value: number) => string;
+    let signedFormatter: (value: number) => string;
+
+    beforeAll(() => {
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: new URL('http://localhost/?tenant_country=IN'),
+      });
+      formatter = createSmartNumberFormatter();
+      signedFormatter = createSmartNumberFormatter({ signed: true });
+    });
+
+    afterAll(() => {
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: originalLocation,
+      });
+    });
+
+    test('formats 0 correctly', () => {
+      expect(formatter(0)).toBe('0');
+    });
+
+    describe('for positive numbers', () => {
+      test('formats thousands with K', () => {
+        expect(formatter(1000)).toBe('1K');
+        expect(formatter(10001)).toBe('10K');
+        expect(formatter(10100)).toBe('10.1K');
+        expect(formatter(50000)).toBe('50K');
+        expect(formatter(99999)).toBe('100K');
+      });
+      test('formats lakhs with L (1,00,000)', () => {
+        expect(formatter(100000)).toBe('1L');
+        expect(formatter(150000)).toBe('1.5L');
+        expect(formatter(1234567)).toBe('12.3L');
+        expect(formatter(9999999)).toBe('100L');
+      });
+      test('formats crores with Cr (1,00,00,000)', () => {
+        expect(formatter(10000000)).toBe('1Cr');
+        expect(formatter(45600000)).toBe('4.56Cr');
+        expect(formatter(123456789)).toBe('12.3Cr');
+        expect(formatter(1609480000)).toBe('161Cr');
+      });
+      test('numbers below 1,000 defer to the shared formatter', () => {
+        expect(formatter(999)).toBe('999');
+        expect(formatter(274.2856)).toBe('274.29');
+        // 0.0023 keeps 4 decimals here (a 2-decimal round would collapse it to "0")
+        expect(formatter(0.0023)).toBe('0.0023');
+        expect(formatter(0.000023)).toBe('23µ');
+        expect(formatter(0.0000001)).toBe('100n');
+      });
+    });
+
+    describe('for negative numbers', () => {
+      test('uses ASCII hyphen-minus (U+002D), not Unicode minus (U+2212)', () => {
+        expect(formatter(-1000).charCodeAt(0)).toBe(45);
+      });
+      test('formats with Indian grouping and a leading minus', () => {
+        expect(formatter(-1000)).toBe('-1K');
+        expect(formatter(-1234567)).toBe('-12.3L');
+        expect(formatter(-45600000)).toBe('-4.56Cr');
+        expect(formatter(-0.0023)).toBe('-0.0023');
+      });
+    });
+
+    describe('when options.signed is true', () => {
+      test('adds + for positive and - for negative numbers', () => {
+        expect(signedFormatter(1000)).toBe('+1K');
+        expect(signedFormatter(45600000)).toBe('+4.56Cr');
+        expect(signedFormatter(-45600000)).toBe('-4.56Cr');
+        expect(signedFormatter(0)).toBe('0');
+      });
+    });
+  });
 });
