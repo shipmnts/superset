@@ -23,7 +23,8 @@
 #
 # WHAT IT DOES (in order, with a confirmation prompt before mutating anything):
 #   1. pg_dump backup of the target DB (your rollback)
-#   2. read-only audit: counts + legacy-chart check + alembic version
+#   2. read-only audit: counts + legacy-chart check + `*/`-in-dataset-SQL check
+#      + alembic version
 #   3. sequence resync   <-- REQUIRED; migration fails without it
 #   4. superset db upgrade + superset init   (run with the 6.1.0 code)
 #   5. verify: alembic head + counts unchanged
@@ -125,6 +126,34 @@ LEGACY=$("${PSQL[@]}" -tAc \
 echo "   legacy viz types present: $LEGACY"
 [[ "$LEGACY" != "(none)" && "$LEGACY" != "?" ]] && \
   printf '\033[1;33m   ! some of these are removed/one-way-migrated in 5.0/6.x — review before cutover\033[0m\n'
+
+# Virtual-dataset comments containing `*/`.
+#
+# 6.x re-parses SQL with sqlglot, which rewrites `--` line comments as `/* ... */`
+# block comments. A `*/` inside such a comment (e.g. `-- avg_*/*_deviation:`) then
+# closes the block early and the rest of the line leaks out as SQL:
+#
+#   -- avg_*/*_deviation: AVG() OVER (...)     <- fine on 4.0.2
+#   /* avg_*/*_deviation: AVG() OVER (...) */  <- 6.x: syntax error at or near "*"
+#
+# The migration itself succeeds; the charts break afterwards, which makes this
+# easy to miss until users hit it. Detected here, not auto-fixed: the remedy is a
+# wording change only a human should choose.
+#
+# Scoped to `--` lines on purpose. A plain `%*/%` match also hits every
+# legitimate /* ... */ block comment, and a check that cries wolf gets ignored.
+BADSQL=$("${PSQL[@]}" -tAc \
+  "SELECT COALESCE(string_agg(id || ' (' || table_name || ')', ', ' ORDER BY id),'(none)') \
+   FROM tables WHERE sql IS NOT NULL AND EXISTS ( \
+     SELECT 1 FROM unnest(string_to_array(sql, chr(10))) AS l(line) \
+     WHERE ltrim(l.line) LIKE '--%' AND l.line LIKE '%*/%')" \
+  2>/dev/null || echo "?")
+echo "   datasets w/ '*/' in comment: $BADSQL"
+if [[ "$BADSQL" != "(none)" && "$BADSQL" != "?" ]]; then
+  printf '\033[1;33m   ! these virtual datasets will throw `syntax error at or near "*"` on 6.x\033[0m\n'
+  printf '\033[1;33m     see local-setup/manually_run_migration.md for the detect/fix SQL\033[0m\n'
+  printf '\033[1;33m     then re-run with --audit-only to confirm it reports (none)\033[0m\n'
+fi
 
 if $AUDIT_ONLY; then ok "audit-only: done (nothing changed)"; exit 0; fi
 

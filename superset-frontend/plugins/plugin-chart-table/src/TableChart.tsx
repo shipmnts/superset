@@ -904,7 +904,12 @@ export default function TableChart<D extends DataRecord = DataRecord>(
         basicColorFormatters.length > 0;
       const generalShowCellBars =
         config.showCellBars === undefined ? showCellBars : config.showCellBars;
+      // Fork: restore the 4.0.2 gate. Apache narrowed this to
+      // basicColorFormatters, which turns cell bars on for every metric column
+      // that has no conditional formatting of its own -- a visible change on
+      // charts that combine "show cell bars" with conditional formatting.
       const valueRange =
+        !hasColumnColorFormatters &&
         !hasBasicColorFormatters &&
         generalShowCellBars &&
         (isMetric || isRawRecords || isPercentMetric) &&
@@ -1242,7 +1247,7 @@ export default function TableChart<D extends DataRecord = DataRecord>(
                   align-items: center;
                   & svg {
                     margin-left: ${theme.sizeUnit}px;
-                    color: ${theme.colorBorder} !important;
+                    color: ${theme.colorText} !important;
                   }
                 `}
               >
