@@ -16,24 +16,39 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React, { useMemo } from 'react';
+import { styled, css, useTheme } from '@apache-superset/core/theme';
+import { t } from '@apache-superset/core/translation';
+import { GenericDataType } from '@apache-superset/core/common';
+import { useMemo } from 'react';
 import { zip } from 'lodash';
-import { css, GenericDataType, styled } from '@superset-ui/core';
+import { Select } from 'antd';
+import { Tooltip } from '@superset-ui/core/components';
+import { Icons } from '@superset-ui/core/components/Icons';
 import {
   CopyToClipboardButton,
   FilterInput,
 } from 'src/explore/components/DataTableControl';
 import { applyFormattingToTabularData } from 'src/utils/common';
 import { getTimeColumns } from 'src/explore/components/DataTableControl/utils';
-import RowCountLabel from 'src/explore/components/RowCountLabel';
+import RowCountLabel from 'src/components/RowCountLabel';
+import DownloadDropdown from 'src/components/Chart/DrillDetail/DownloadDropdown';
 import { TableControlsProps } from '../types';
+
+export const ROW_LIMIT_OPTIONS = [
+  { value: 100, label: '100 rows' },
+  { value: 500, label: '500 rows' },
+  { value: 1000, label: '1k rows' },
+  { value: 5000, label: '5k rows' },
+  { value: 10000, label: '10k rows' },
+];
 
 export const TableControlsWrapper = styled.div`
   ${({ theme }) => `
     display: flex;
     align-items: center;
+    padding-top: ${theme.sizeUnit * 2}px;
+    padding-bottom: ${theme.sizeUnit * 2}px;
     justify-content: space-between;
-    margin-bottom: ${theme.gridUnit * 2}px;
 
     span {
       flex-shrink: 0;
@@ -49,7 +64,15 @@ export const TableControls = ({
   columnTypes,
   rowcount,
   isLoading,
+  canDownload,
+  rowLimit,
+  rowLimitOptions,
+  onRowLimitChange,
+  onDownloadCSV,
+  onDownloadXLSX,
+  onReload,
 }: TableControlsProps) => {
+  const theme = useTheme();
   const originalTimeColumns = getTimeColumns(datasourceId);
   const formattedTimeColumns = zip<string, GenericDataType>(
     columnNames,
@@ -61,22 +84,64 @@ export const TableControls = ({
         name &&
         !originalTimeColumns.includes(name),
     )
-    .map(([colname]) => colname);
+    .map(([colname]) => colname)
+    .filter((x): x is string => x !== undefined);
   const formattedData = useMemo(
     () => applyFormattingToTabularData(data, formattedTimeColumns),
     [data, formattedTimeColumns],
   );
   return (
     <TableControlsWrapper>
-      <FilterInput onChangeHandler={onInputChange} />
+      <FilterInput onChangeHandler={onInputChange} shouldFocus />
       <div
         css={css`
           display: flex;
           align-items: center;
+          gap: 8px;
         `}
       >
-        <RowCountLabel rowcount={rowcount} loading={isLoading} />
-        <CopyToClipboardButton data={formattedData} columns={columnNames} />
+        {onRowLimitChange && (
+          <Select
+            value={rowLimit}
+            onChange={onRowLimitChange}
+            options={rowLimitOptions}
+            size="small"
+            css={css`
+              min-width: 110px;
+            `}
+          />
+        )}
+        {(!onRowLimitChange || rowcount < (rowLimit ?? Infinity)) && (
+          <RowCountLabel rowcount={rowcount} loading={isLoading} />
+        )}
+        {canDownload && onDownloadCSV && onDownloadXLSX && (
+          <DownloadDropdown
+            onDownloadCSV={onDownloadCSV}
+            onDownloadXLSX={onDownloadXLSX}
+          />
+        )}
+        {canDownload && (
+          <CopyToClipboardButton data={formattedData} columns={columnNames} />
+        )}
+        {onReload && (
+          <Tooltip title={t('Reload')}>
+            <button
+              type="button"
+              aria-label={t('Reload')}
+              onClick={onReload}
+              css={css`
+                display: inline-flex;
+                align-items: center;
+                padding: 0;
+                border: none;
+                background: none;
+                cursor: pointer;
+              `}
+            >
+              <Icons.ReloadOutlined iconColor={theme.colorIcon} iconSize="l" />
+            </button>
+          </Tooltip>
+        )}
       </div>
     </TableControlsWrapper>
   );

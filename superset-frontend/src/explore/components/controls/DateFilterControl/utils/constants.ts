@@ -16,27 +16,49 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import moment from 'moment';
-import { t } from '@superset-ui/core';
+import { t } from '@apache-superset/core/translation';
 import {
   SelectOptionType,
   PreviousCalendarWeek,
   PreviousCalendarMonth,
+  PreviousCalendarQuarter,
   PreviousCalendarYear,
   CommonRangeType,
   CalendarRangeType,
+  CurrentRangeType,
+  CurrentWeek,
+  CurrentMonth,
+  CurrentYear,
+  CurrentQuarter,
+  CurrentDay,
+  FrameType,
 } from 'src/explore/components/controls/DateFilterControl/types';
+import { CheckboxOptionType } from '@superset-ui/core/components/Radio';
+import { extendedDayjs } from '@superset-ui/core/utils/dates';
+import dayjs, { Dayjs } from 'dayjs';
+import quarterOfYear from 'dayjs/plugin/quarterOfYear';
+import weekOfYear from 'dayjs/plugin/weekOfYear';
+
+// The Custom Calendar presets need quarter/week granularity, which are not
+// among the plugins loaded by `@superset-ui/core/utils/dates`.
+dayjs.extend(quarterOfYear);
+dayjs.extend(weekOfYear);
+
+// `CUSTOM_CALENDAR` was a fork addition to `@superset-ui/core` in the 4.x fork;
+// it does not exist in 6.1.0 core, so it is defined locally here.
+export const CUSTOM_CALENDAR: FrameType = 'Custom Calendar';
 
 export const FRAME_OPTIONS: SelectOptionType[] = [
   { value: 'Custom Calendar', label: t('Custom Calendar') },
   { value: 'Common', label: t('Last') },
   { value: 'Calendar', label: t('Previous') },
+  { value: 'Current', label: t('Current') },
   { value: 'Custom', label: t('Custom') },
   { value: 'Advanced', label: t('Advanced') },
   { value: 'No filter', label: t('No filter') },
 ];
 
-export const COMMON_RANGE_OPTIONS: SelectOptionType[] = [
+export const COMMON_RANGE_OPTIONS: CheckboxOptionType[] = [
   { value: 'Last day', label: t('Last day') },
   { value: 'Last week', label: t('Last week') },
   { value: 'Last month', label: t('Last month') },
@@ -44,19 +66,28 @@ export const COMMON_RANGE_OPTIONS: SelectOptionType[] = [
   { value: 'Last year', label: t('Last year') },
 ];
 export const COMMON_RANGE_VALUES_SET = new Set(
-  COMMON_RANGE_OPTIONS.map(({ value }) => value),
+  COMMON_RANGE_OPTIONS.map(value => value.value),
 );
 
-export const CALENDAR_RANGE_OPTIONS: SelectOptionType[] = [
+export const CALENDAR_RANGE_OPTIONS: CheckboxOptionType[] = [
   { value: PreviousCalendarWeek, label: t('previous calendar week') },
-  {
-    value: PreviousCalendarMonth,
-    label: t('previous calendar month'),
-  },
+  { value: PreviousCalendarMonth, label: t('previous calendar month') },
+  { value: PreviousCalendarQuarter, label: t('previous calendar quarter') },
   { value: PreviousCalendarYear, label: t('previous calendar year') },
 ];
 export const CALENDAR_RANGE_VALUES_SET = new Set(
-  CALENDAR_RANGE_OPTIONS.map(({ value }) => value),
+  CALENDAR_RANGE_OPTIONS.map(value => value.value),
+);
+
+export const CURRENT_RANGE_OPTIONS: CheckboxOptionType[] = [
+  { value: CurrentDay, label: t('Current day') },
+  { value: CurrentWeek, label: t('Current week') },
+  { value: CurrentMonth, label: t('Current month') },
+  { value: CurrentQuarter, label: t('Current quarter') },
+  { value: CurrentYear, label: t('Current year') },
+];
+export const CURRENT_RANGE_VALUES_SET = new Set(
+  CURRENT_RANGE_OPTIONS.map(value => value.value),
 );
 
 const GRAIN_OPTIONS = [
@@ -105,33 +136,28 @@ export const COMMON_RANGE_SET: Set<CommonRangeType> = new Set([
 export const CALENDAR_RANGE_SET: Set<CalendarRangeType> = new Set([
   PreviousCalendarWeek,
   PreviousCalendarMonth,
+  PreviousCalendarQuarter,
   PreviousCalendarYear,
 ]);
 
-export const MOMENT_FORMAT = 'YYYY-MM-DD[T]HH:mm:ss';
-export const SEVEN_DAYS_AGO = moment()
+export const CURRENT_CALENDAR_RANGE_SET: Set<CurrentRangeType> = new Set([
+  CurrentDay,
+  CurrentWeek,
+  CurrentMonth,
+  CurrentQuarter,
+  CurrentYear,
+]);
+
+export const DAYJS_FORMAT = 'YYYY-MM-DD[T]HH:mm:ss';
+export const SEVEN_DAYS_AGO = extendedDayjs()
   .utc()
   .startOf('day')
   .subtract(7, 'days')
-  .format(MOMENT_FORMAT);
-export const MIDNIGHT = moment().utc().startOf('day').format(MOMENT_FORMAT);
-
-export const LOCALE_MAPPING = {
-  en: 'en_US',
-  fr: 'fr_FR',
-  es: 'es_ES',
-  it: 'it_IT',
-  zh: 'zh_CN',
-  ja: 'ja_JP',
-  de: 'de_DE',
-  pt: 'pt_PT',
-  pt_BR: 'pt_BR',
-  ru: 'ru_RU',
-  ko: 'ko_KR',
-  sk: 'sk_SK',
-  sl: 'sl_SI',
-  nl: 'nl_NL',
-};
+  .format(DAYJS_FORMAT);
+export const MIDNIGHT = extendedDayjs()
+  .utc()
+  .startOf('day')
+  .format(DAYJS_FORMAT);
 
 export enum DateFilterTestKey {
   CommonFrame = 'common-frame',
@@ -142,86 +168,76 @@ export enum DateFilterTestKey {
   ApplyButton = 'date-filter-control__apply-button',
 }
 
-moment.locale('en', {
-  week: {
-    dow: 1,
-  },
-});
+// REFERENCE: https://github.com/apache/superset/issues/26651
+// Week starts on Monday (ISO).
+dayjs.updateLocale('en', { weekStart: 1 });
 
-export const CUSTOM_CALENDAR_RANGE_OPTIONS: Record<
-  string,
-  [moment.Moment, moment.Moment]
-> = {
-  [t('Today')]: [moment(), moment().add(1, 'days')],
+// GOTCHA (faithful, not a regression): this object literal evaluates
+// `extendedDayjs()` "now" anchors ONCE at import (eager). The 4.x fork's
+// constants.ts is also eager. Stale-after-midnight preview is a pre-existing
+// quirk; a lazy-factory fix is deliberately deferred.
+export const CUSTOM_CALENDAR_RANGE_OPTIONS: Record<string, [Dayjs, Dayjs]> = {
+  [t('Today')]: [extendedDayjs(), extendedDayjs().add(1, 'days')],
   [t('Current Week')]: [
-    moment().startOf('week'),
-    moment().endOf('week').add(1, 'days'),
+    extendedDayjs().startOf('week'),
+    extendedDayjs().endOf('week').add(1, 'days'),
   ],
   [t('Current Month')]: [
-    moment().startOf('month'),
-    moment().endOf('month').add(1, 'days'),
+    extendedDayjs().startOf('month'),
+    extendedDayjs().endOf('month').add(1, 'days'),
   ],
   [t('Current Quarter')]: [
-    moment().startOf('quarter'),
-    moment().endOf('quarter').add(1, 'days'),
+    extendedDayjs().startOf('quarter'),
+    extendedDayjs().endOf('quarter').add(1, 'days'),
   ],
   [t('Current Year')]: [
-    moment().startOf('year'),
-    moment().endOf('year').add(1, 'days'),
+    extendedDayjs().startOf('year'),
+    extendedDayjs().endOf('year').add(1, 'days'),
   ],
-  [t('Week-to-Date')]: [
-    moment().startOf('week'),
-    moment(),
-  ],
-  [t('Month-to-Date')]: [
-    moment().startOf('month'),
-    moment(),
-  ],
-  [t('Quarter-to-Date')]: [
-    moment().startOf('quarter'),
-    moment(),
-  ],
-  [t('Year-to-Date')]: [
-    moment().startOf('year'),
-    moment(),
-  ],
+  [t('Week-to-Date')]: [extendedDayjs().startOf('week'), extendedDayjs()],
+  [t('Month-to-Date')]: [extendedDayjs().startOf('month'), extendedDayjs()],
+  [t('Quarter-to-Date')]: [extendedDayjs().startOf('quarter'), extendedDayjs()],
+  [t('Year-to-Date')]: [extendedDayjs().startOf('year'), extendedDayjs()],
   [t('Yesterday')]: [
-    moment().subtract(1, 'days'),
-    moment().subtract(1, 'days').add(1, 'days'),
+    extendedDayjs().subtract(1, 'days'),
+    extendedDayjs().subtract(1, 'days').add(1, 'days'),
   ],
   [t('Previous Week')]: [
-    moment().subtract(1, 'weeks').startOf('week'),
-    moment().subtract(1, 'weeks').endOf('week').add(1, 'days'),
+    extendedDayjs().subtract(1, 'weeks').startOf('week'),
+    extendedDayjs().subtract(1, 'weeks').endOf('week').add(1, 'days'),
   ],
   [t('Previous Month')]: [
-    moment().subtract(1, 'months').startOf('month'),
-    moment().subtract(1, 'months').endOf('month').add(1, 'days'),
+    extendedDayjs().subtract(1, 'months').startOf('month'),
+    extendedDayjs().subtract(1, 'months').endOf('month').add(1, 'days'),
   ],
   [t('Previous Quarter')]: [
-    moment().subtract(1, 'quarters').startOf('quarter'),
-    moment().subtract(1, 'quarters').endOf('quarter').add(1, 'days'),
+    extendedDayjs().subtract(1, 'quarters').startOf('quarter'),
+    extendedDayjs().subtract(1, 'quarters').endOf('quarter').add(1, 'days'),
   ],
   [t('Previous Year')]: [
-    moment().subtract(1, 'years').startOf('year'),
-    moment().subtract(1, 'years').endOf('year').add(1, 'days'),
+    extendedDayjs().subtract(1, 'years').startOf('year'),
+    extendedDayjs().subtract(1, 'years').endOf('year').add(1, 'days'),
   ],
+  // The `Last *` tokens are dead in the backend (shadowed by the upstream
+  // `Last` handler) — kept faithful to the fork.
   [t('Last Week')]: [
-    moment().subtract(7, 'days'),
-    moment().subtract(1, 'days').add(1, 'days'),
+    extendedDayjs().subtract(7, 'days'),
+    extendedDayjs().subtract(1, 'days').add(1, 'days'),
   ],
   [t('Last Month')]: [
-    moment().subtract(1, 'months'),
-    moment().subtract(1, 'days').add(1, 'days'),
+    extendedDayjs().subtract(1, 'months'),
+    extendedDayjs().subtract(1, 'days').add(1, 'days'),
   ],
   [t('Last Quarter')]: [
-    moment().subtract(3, 'months'),
-    moment().subtract(1, 'days').add(1, 'days'),
+    extendedDayjs().subtract(3, 'months'),
+    extendedDayjs().subtract(1, 'days').add(1, 'days'),
   ],
   [t('Last Year')]: [
-    moment().subtract(1, 'years'),
-    moment().subtract(1, 'days').add(1, 'days'),
+    extendedDayjs().subtract(1, 'years'),
+    extendedDayjs().subtract(1, 'days').add(1, 'days'),
   ],
 };
+
 export const CUSTOM_CALENDAR_RANGE_VALUES_SET = new Set(
-  Object.keys(CUSTOM_CALENDAR_RANGE_OPTIONS)
+  Object.keys(CUSTOM_CALENDAR_RANGE_OPTIONS),
 );

@@ -16,20 +16,20 @@
 # under the License.
 # isort:skip_file
 
-import json
 import logging
 from collections.abc import Iterator
+from typing import Callable
 
 import yaml
 
 from superset.commands.export.models import ExportModelsCommand
 from superset.connectors.sqla.models import SqlaTable
-from superset.daos.database import DatabaseDAO
 from superset.commands.dataset.exceptions import DatasetNotFoundError
 from superset.daos.dataset import DatasetDAO
 from superset.utils.dict_import_export import EXPORT_VERSION
 from superset.utils.file import get_filename
 from superset.utils.ssh_tunnel import mask_password_info
+from superset.utils import json
 
 logger = logging.getLogger(__name__)
 
@@ -41,15 +41,15 @@ class ExportDatasetsCommand(ExportModelsCommand):
     not_found = DatasetNotFoundError
 
     @staticmethod
-    def _export(
-        model: SqlaTable, export_related: bool = True
-    ) -> Iterator[tuple[str, str]]:
+    def _file_name(model: SqlaTable) -> str:
         db_file_name = get_filename(
             model.database.database_name, model.database.id, skip_id=True
         )
-        ds_file_name = get_filename(model.table_name, model.id, skip_id=True)
-        file_path = f"datasets/{db_file_name}/{ds_file_name}.yaml"
+        ds_file_name = get_filename(model.table_name, model.id)
+        return f"datasets/{db_file_name}/{ds_file_name}.yaml"
 
+    @staticmethod
+    def _file_content(model: SqlaTable) -> str:
         payload = model.export_to_dict(
             recursive=True,
             include_parent_ref=False,
@@ -62,14 +62,14 @@ class ExportDatasetsCommand(ExportModelsCommand):
             if payload.get(key):
                 try:
                     payload[key] = json.loads(payload[key])
-                except json.decoder.JSONDecodeError:
+                except json.JSONDecodeError:
                     logger.info("Unable to decode `%s` field: %s", key, payload[key])
         for key in ("metrics", "columns"):
             for attributes in payload.get(key, []):
                 if attributes.get("extra"):
                     try:
                         attributes["extra"] = json.loads(attributes["extra"])
-                    except json.decoder.JSONDecodeError:
+                    except json.JSONDecodeError:
                         logger.info(
                             "Unable to decode `extra` field: %s", attributes["extra"]
                         )
@@ -77,11 +77,30 @@ class ExportDatasetsCommand(ExportModelsCommand):
         payload["version"] = EXPORT_VERSION
         payload["database_uuid"] = str(model.database.uuid)
 
+        # Always set cache_timeout from the property to ensure correct value
+        payload["cache_timeout"] = model.cache_timeout
+
+        # SQLAlchemy returns column names as quoted_name objects which PyYAML cannot
+        # serialize. Convert all keys to regular strings to fix YAML serialization.
+        payload = {str(key): value for key, value in payload.items()}
+
         file_content = yaml.safe_dump(payload, sort_keys=False)
-        yield file_path, file_content
+        return file_content
+
+    @staticmethod
+    def _export(
+        model: SqlaTable, export_related: bool = True
+    ) -> Iterator[tuple[str, Callable[[], str]]]:
+        yield (
+            ExportDatasetsCommand._file_name(model),
+            lambda: ExportDatasetsCommand._file_content(model),
+        )
 
         # include database as well
         if export_related:
+            db_file_name = get_filename(
+                model.database.database_name, model.database.id, skip_id=True
+            )
             file_path = f"databases/{db_file_name}.yaml"
 
             payload = model.database.export_to_dict(
@@ -95,10 +114,10 @@ class ExportDatasetsCommand(ExportModelsCommand):
             if payload.get("extra"):
                 try:
                     payload["extra"] = json.loads(payload["extra"])
-                except json.decoder.JSONDecodeError:
+                except json.JSONDecodeError:
                     logger.info("Unable to decode `extra` field: %s", payload["extra"])
 
-            if ssh_tunnel := DatabaseDAO.get_ssh_tunnel(model.database.id):
+            if ssh_tunnel := model.database.ssh_tunnel:
                 ssh_tunnel_payload = ssh_tunnel.export_to_dict(
                     recursive=False,
                     include_parent_ref=False,
@@ -109,5 +128,4 @@ class ExportDatasetsCommand(ExportModelsCommand):
 
             payload["version"] = EXPORT_VERSION
 
-            file_content = yaml.safe_dump(payload, sort_keys=False)
-            yield file_path, file_content
+            yield file_path, lambda: yaml.safe_dump(payload, sort_keys=False)

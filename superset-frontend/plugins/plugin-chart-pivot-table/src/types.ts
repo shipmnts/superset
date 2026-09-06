@@ -69,6 +69,8 @@ interface PivotTableCustomizeProps {
   expandCollapse: boolean;
   valueFormat: string;
   currencyFormat: Currency;
+  currencyCodeColumn?: string;
+  detectedCurrency?: string | null;
   setDataMask: SetDataMaskHook;
   emitCrossFilters?: boolean;
   selectedFilters?: SelectedFiltersType;
@@ -88,6 +90,7 @@ interface PivotTableCustomizeProps {
   timeGrainSqla?: TimeGranularity;
   time_grain_sqla?: TimeGranularity;
   granularity_sqla?: string;
+  allowRenderHtml?: boolean;
 }
 
 export type PivotTableQueryFormData = QueryFormData &

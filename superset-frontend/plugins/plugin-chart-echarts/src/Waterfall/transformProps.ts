@@ -20,16 +20,17 @@ import {
   CurrencyFormatter,
   DataRecord,
   ensureIsArray,
-  GenericDataType,
   getMetricLabel,
   getNumberFormatter,
   getTimeFormatter,
   isAdhocColumn,
   NumberFormatter,
   rgbToHex,
-  SupersetTheme,
+  tooltipHtml,
 } from '@superset-ui/core';
-import { EChartsOption, BarSeriesOption } from 'echarts';
+import { GenericDataType } from '@apache-superset/core/common';
+import type { ComposeOption } from 'echarts/core';
+import type { BarSeriesOption } from 'echarts/charts';
 import {
   EchartsWaterfallChartProps,
   ISeriesData,
@@ -43,18 +44,20 @@ import { getColtypesMapping } from '../utils/series';
 import { Refs } from '../types';
 import { NULL_STRING } from '../constants';
 
+type EChartsOption = ComposeOption<BarSeriesOption>;
+
 function formatTooltip({
-  theme,
   params,
   breakdownName,
   defaultFormatter,
   xAxisFormatter,
+  totalMark,
 }: {
-  theme: SupersetTheme;
   params: ICallbackDataParams[];
   breakdownName?: string;
   defaultFormatter: NumberFormatter | CurrencyFormatter;
   xAxisFormatter: (value: number | string, index: number) => string;
+  totalMark: string;
 }) {
   const series = params.find(
     param => param.seriesName !== ASSIST_MARK && param.data.value !== TOKEN,
@@ -65,45 +68,24 @@ function formatTooltip({
     return '';
   }
 
-  const isTotal = series?.seriesName === LEGEND.TOTAL;
+  const isTotal = series?.seriesName === totalMark;
   if (!series) {
     return NULL_STRING;
   }
 
-  const createRow = (name: string, value: string) => `
-    <div>
-      <span style="
-        font-size:${theme.typography.sizes.m}px;
-        color:${theme.colors.grayscale.base};
-        font-weight:${theme.typography.weights.normal};
-        margin-left:${theme.gridUnit * 0.5}px;"
-      >
-        ${name}:
-      </span>
-      <span style="
-        float:right;
-        margin-left:${theme.gridUnit * 5}px;
-        font-size:${theme.typography.sizes.m}px;
-        color:${theme.colors.grayscale.base};
-        font-weight:${theme.typography.weights.bold}"
-      >
-        ${value}
-      </span>
-    </div>
-  `;
-
-  let result = '';
-  if (!isTotal || breakdownName) {
-    result = xAxisFormatter(series.name, series.dataIndex);
-  }
+  const title =
+    !isTotal || breakdownName
+      ? xAxisFormatter(series.name, series.dataIndex)
+      : undefined;
+  const rows: string[][] = [];
   if (!isTotal) {
-    result += createRow(
+    rows.push([
       series.seriesName!,
       defaultFormatter(series.data.originalValue),
-    );
+    ]);
   }
-  result += createRow(TOTAL_MARK, defaultFormatter(series.data.totalSum));
-  return result;
+  rows.push([totalMark, defaultFormatter(series.data.totalSum)]);
+  return tooltipHtml(rows, title);
 }
 
 function transformer({
@@ -111,11 +93,15 @@ function transformer({
   xAxis,
   metric,
   breakdown,
+  totalMark,
+  showTotal,
 }: {
   data: DataRecord[];
   xAxis: string;
   metric: string;
   breakdown?: string;
+  totalMark: string;
+  showTotal: boolean;
 }) {
   // Group by series (temporary map)
   const groupedData = data.reduce((acc, cur) => {
@@ -137,11 +123,13 @@ function transformer({
         0,
       );
       // Push total per period to the end of period values array
-      tempValue.push({
-        [xAxis]: key,
-        [breakdown]: TOTAL_MARK,
-        [metric]: sum,
-      });
+      if (showTotal) {
+        tempValue.push({
+          [xAxis]: key,
+          [breakdown]: totalMark,
+          [metric]: sum,
+        });
+      }
       transformedData.push(...tempValue);
     });
   } else {
@@ -157,10 +145,12 @@ function transformer({
       });
       total += sum;
     });
-    transformedData.push({
-      [xAxis]: TOTAL_MARK,
-      [metric]: total,
-    });
+    if (showTotal) {
+      transformedData.push({
+        [xAxis]: totalMark,
+        [metric]: total,
+      });
+    }
   }
 
   return transformedData;
@@ -199,10 +189,21 @@ export default function transformProps(
     xAxisLabel,
     yAxisFormat,
     showValue,
+    showTotal,
+    totalLabel,
+    increaseLabel,
+    decreaseLabel,
   } = formData;
   const defaultFormatter = currencyFormat?.symbol
     ? new CurrencyFormatter({ d3Format: yAxisFormat, currency: currencyFormat })
     : getNumberFormatter(yAxisFormat);
+
+  const totalMark = totalLabel || TOTAL_MARK;
+  const legendNames = {
+    INCREASE: increaseLabel || LEGEND.INCREASE,
+    DECREASE: decreaseLabel || LEGEND.DECREASE,
+    TOTAL: totalLabel || LEGEND.TOTAL,
+  };
 
   const seriesformatter = (params: ICallbackDataParams) => {
     const { data } = params;
@@ -225,6 +226,8 @@ export default function transformProps(
     breakdown: breakdownName,
     xAxis: xAxisName,
     metric: metricLabel,
+    totalMark,
+    showTotal,
   });
 
   const assistData: ISeriesData[] = [];
@@ -237,18 +240,18 @@ export default function transformProps(
   transformedData.forEach((datum, index, self) => {
     const totalSum = self.slice(0, index + 1).reduce((prev, cur, i) => {
       if (breakdownName) {
-        if (cur[breakdownName] !== TOTAL_MARK || i === 0) {
+        if (cur[breakdownName] !== totalMark || i === 0) {
           return prev + ((cur[metricLabel] as number) ?? 0);
         }
-      } else if (cur[xAxisName] !== TOTAL_MARK) {
+      } else if (cur[xAxisName] !== totalMark) {
         return prev + ((cur[metricLabel] as number) ?? 0);
       }
       return prev;
     }, 0);
 
     const isTotal =
-      (breakdownName && datum[breakdownName] === TOTAL_MARK) ||
-      datum[xAxisName] === TOTAL_MARK;
+      (breakdownName && datum[breakdownName] === totalMark) ||
+      datum[xAxisName] === totalMark;
 
     const originalValue = datum[metricLabel] as number;
     let value = originalValue;
@@ -290,9 +293,9 @@ export default function transformProps(
       : 'transparent';
 
     let opacity = 1;
-    if (legendState?.[LEGEND.INCREASE] === false && value > 0) {
+    if (legendState?.[legendNames.INCREASE] === false && value > 0) {
       opacity = 0;
-    } else if (legendState?.[LEGEND.DECREASE] === false && value < 0) {
+    } else if (legendState?.[legendNames.DECREASE] === false && value < 0) {
       opacity = 0;
     }
 
@@ -321,7 +324,7 @@ export default function transformProps(
   const xAxisData = transformedData.map(row => {
     let column = xAxisName;
     let value = row[xAxisName];
-    if (breakdownName && row[breakdownName] !== TOTAL_MARK) {
+    if (breakdownName && row[breakdownName] !== totalMark) {
       column = breakdownName;
       value = row[breakdownName];
     }
@@ -336,8 +339,8 @@ export default function transformProps(
   });
 
   const xAxisFormatter = (value: number | string, index: number) => {
-    if (value === TOTAL_MARK) {
-      return TOTAL_MARK;
+    if (value === totalMark) {
+      return totalMark;
     }
     if (coltypeMapping[xAxisColumns[index]] === GenericDataType.Temporal) {
       if (typeof value === 'string') {
@@ -375,7 +378,13 @@ export default function transformProps(
       disabled: true,
     },
   };
-
+  const labelProps = {
+    show: showValue,
+    formatter: seriesformatter,
+    color: theme.colorText,
+    borderColor: theme.colorBgBase,
+    borderWidth: 1,
+  };
   const barSeries: BarSeriesOption[] = [
     {
       ...seriesProps,
@@ -384,11 +393,10 @@ export default function transformProps(
     },
     {
       ...seriesProps,
-      name: LEGEND.INCREASE,
+      name: legendNames.INCREASE,
       label: {
-        show: showValue,
+        ...labelProps,
         position: 'top',
-        formatter: seriesformatter,
       },
       itemStyle: {
         color: rgbToHex(increaseColor.r, increaseColor.g, increaseColor.b),
@@ -397,11 +405,10 @@ export default function transformProps(
     },
     {
       ...seriesProps,
-      name: LEGEND.DECREASE,
+      name: legendNames.DECREASE,
       label: {
-        show: showValue,
+        ...labelProps,
         position: 'bottom',
-        formatter: seriesformatter,
       },
       itemStyle: {
         color: rgbToHex(decreaseColor.r, decreaseColor.g, decreaseColor.b),
@@ -410,11 +417,10 @@ export default function transformProps(
     },
     {
       ...seriesProps,
-      name: LEGEND.TOTAL,
+      name: legendNames.TOTAL,
       label: {
-        show: showValue,
+        ...labelProps,
         position: 'top',
-        formatter: seriesformatter,
       },
       itemStyle: {
         color: rgbToHex(totalColor.r, totalColor.g, totalColor.b),
@@ -426,22 +432,22 @@ export default function transformProps(
   const echartOptions: EChartsOption = {
     grid: {
       ...defaultGrid,
-      top: theme.gridUnit * 7,
-      bottom: theme.gridUnit * 7,
-      left: theme.gridUnit * 5,
-      right: theme.gridUnit * 7,
+      top: theme.sizeUnit * 7,
+      bottom: theme.sizeUnit * 7,
+      left: theme.sizeUnit * 5,
+      right: theme.sizeUnit * 7,
     },
     legend: {
       show: showLegend,
       selected: legendState,
-      data: [LEGEND.INCREASE, LEGEND.DECREASE, LEGEND.TOTAL],
+      data: [legendNames.INCREASE, legendNames.DECREASE, legendNames.TOTAL],
     },
     xAxis: {
       data: xAxisData,
       type: 'category',
       name: xAxisLabel,
       nameTextStyle: {
-        padding: [theme.gridUnit * 4, 0, 0, 0],
+        padding: [theme.sizeUnit * 4, 0, 0, 0],
       },
       nameLocation: 'middle',
       axisLabel,
@@ -450,7 +456,7 @@ export default function transformProps(
       ...defaultYAxis,
       type: 'value',
       nameTextStyle: {
-        padding: [0, 0, theme.gridUnit * 5, 0],
+        padding: [0, 0, theme.sizeUnit * 5, 0],
       },
       nameLocation: 'middle',
       name: yAxisLabel,
@@ -463,11 +469,11 @@ export default function transformProps(
       show: !inContextMenu,
       formatter: (params: any) =>
         formatTooltip({
-          theme,
           params,
           breakdownName,
           defaultFormatter,
           xAxisFormatter,
+          totalMark,
         }),
     },
     series: barSeries,

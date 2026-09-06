@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 """A collection of ORM sqlalchemy models for SQL Lab"""
+
 import builtins
 import inspect
 import logging
@@ -23,14 +24,14 @@ from collections.abc import Hashable
 from datetime import datetime
 from typing import Any, Optional, TYPE_CHECKING
 
-import simplejson as json
 import sqlalchemy as sqla
-from flask import current_app, Markup
+from flask import current_app as app
 from flask_appbuilder import Model
 from flask_appbuilder.models.decorators import renders
 from flask_babel import gettext as __
 from humanize import naturaltime
 from jinja2.exceptions import TemplateError
+from markupsafe import Markup
 from sqlalchemy import (
     Boolean,
     Column,
@@ -43,11 +44,17 @@ from sqlalchemy import (
     Text,
 )
 from sqlalchemy.engine.url import URL
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import backref, relationship
 from sqlalchemy.sql.elements import ColumnElement, literal_column
+from superset_core.queries.models import (
+    Query as CoreQuery,
+    SavedQuery as CoreSavedQuery,
+)
 
 from superset import security_manager
-from superset.exceptions import SupersetSecurityException
+from superset.exceptions import SupersetParseError, SupersetSecurityException
+from superset.explorables.base import TimeGrainDict
 from superset.jinja_context import BaseTemplateProcessor, get_template_processor
 from superset.models.helpers import (
     AuditMixinNullable,
@@ -55,9 +62,16 @@ from superset.models.helpers import (
     ExtraJSONMixin,
     ImportExportMixin,
 )
-from superset.sql_parse import CtasMethod, extract_tables_from_jinja_sql, Table
+from superset.sql.parse import (
+    CTASMethod,
+    process_jinja_sql,
+    Table,
+)
 from superset.sqllab.limiting_factor import LimitingFactor
+from superset.superset_typing import ExplorableData, QueryObjectDict
+from superset.utils import json
 from superset.utils.core import (
+    GenericDataType,
     get_column_name,
     LongText,
     MediumText,
@@ -78,20 +92,20 @@ class SqlTablesMixin:  # pylint: disable=too-few-public-methods
     def sql_tables(self) -> list[Table]:
         try:
             return list(
-                extract_tables_from_jinja_sql(
+                process_jinja_sql(
                     self.sql,  # type: ignore
                     self.database,  # type: ignore
-                )
+                ).tables
             )
-        except (SupersetSecurityException, TemplateError):
+        except (SupersetSecurityException, SupersetParseError, TemplateError):
             return []
 
 
 class Query(
+    CoreQuery,
     SqlTablesMixin,
     ExtraJSONMixin,
     ExploreMixin,
-    Model,
 ):  # pylint: disable=abstract-method,too-many-public-methods
     """ORM model for SQL query
 
@@ -111,8 +125,9 @@ class Query(
     user_id = Column(Integer, ForeignKey("ab_user.id"), nullable=True)
     status = Column(String(16), default=QueryStatus.PENDING)
     tab_name = Column(String(256))
-    sql_editor_id = Column(String(256))
+    sql_editor_id = Column(String(256), index=True)
     schema = Column(String(256))
+    catalog = Column(String(256), nullable=True, default=None)
     sql = Column(LongText())
     # Query to retrieve the results,
     # used only in case of select_as_cta_used is true.
@@ -125,7 +140,7 @@ class Query(
     )
     select_as_cta = Column(Boolean)
     select_as_cta_used = Column(Boolean, default=False)
-    ctas_method = Column(String(16), default=CtasMethod.TABLE)
+    ctas_method = Column(String(16), default=CTASMethod.TABLE.name)
 
     progress = Column(Integer, default=0)  # 1..100
     # # of rows in the result set or rows modified.
@@ -145,6 +160,20 @@ class Query(
     changed_on = Column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True
     )
+
+    @hybrid_property
+    def duration(self) -> Optional[float]:
+        start = self.start_running_time or self.start_time
+        if self.end_time is not None and start is not None:
+            return float(self.end_time - start)
+        return None
+
+    @duration.expression  # type: ignore[no-redef]
+    def duration(cls) -> ColumnElement:  # noqa: N805
+        return sqla.func.coalesce(
+            cls.end_time - sqla.func.coalesce(cls.start_running_time, cls.start_time),
+            0,
+        )
 
     database = relationship(
         "Database",
@@ -172,6 +201,7 @@ class Query(
             "limitingFactor": self.limiting_factor,
             "progress": self.progress,
             "rows": self.rows,
+            "catalog": self.catalog,
             "schema": self.schema,
             "ctas": self.select_as_cta,
             "serverId": self.id,
@@ -229,7 +259,8 @@ class Query(
         return None
 
     @property
-    def data(self) -> dict[str, Any]:
+    def data(self) -> ExplorableData:
+        """Returns query data for the frontend"""
         order_by_choices = []
         for col in self.columns:
             column_name = str(col.column_name or "")
@@ -254,6 +285,7 @@ class Query(
             "owners": self.owners_data,
             "database": {"id": self.database_id, "backend": self.database.backend},
             "order_by_choices": order_by_choices,
+            "catalog": self.catalog,
             "schema": self.schema,
             "verbose_map": {},
         }
@@ -320,8 +352,34 @@ class Query(
     def default_endpoint(self) -> str:
         return ""
 
-    def get_extra_cache_keys(self, query_obj: dict[str, Any]) -> list[Hashable]:
+    def get_extra_cache_keys(self, query_obj: QueryObjectDict) -> list[Hashable]:
         return []
+
+    def get_time_grains(self) -> list[TimeGrainDict]:
+        """
+        Get available time granularities from the database.
+
+        Delegates to the database's time grain definitions.
+        """
+        return [
+            {
+                "name": grain.name,
+                "function": grain.function,
+                "duration": grain.duration,
+            }
+            for grain in (self.database.grains() or [])
+        ]
+
+    def has_drill_by_columns(self, column_names: list[str]) -> bool:
+        """
+        Check if the specified columns support drill-by operations.
+
+        For Query objects, all columns are considered drillable since they
+        come from ad-hoc SQL queries without predefined metadata.
+        """
+        if not column_names:
+            return False
+        return set(column_names).issubset(set(self.column_names))
 
     @property
     def tracking_url(self) -> Optional[str]:
@@ -329,7 +387,7 @@ class Query(
         Transform tracking url at run time because the exact URL may depend
         on query properties such as execution and finish time.
         """
-        transform = current_app.config.get("TRACKING_URL_TRANSFORMER")
+        transform = app.config.get("TRACKING_URL_TRANSFORMER")
         url = self.tracking_url_raw
         if url and transform:
             sig = inspect.signature(transform)
@@ -354,34 +412,39 @@ class Query(
 
     def adhoc_column_to_sqla(
         self,
-        col: "AdhocColumn",  # type: ignore
+        col: "AdhocColumn",  # type: ignore  # noqa: F821
         force_type_check: bool = False,
         template_processor: Optional[BaseTemplateProcessor] = None,
-    ) -> ColumnElement:
+    ) -> tuple[ColumnElement, Optional[GenericDataType]]:
         """
         Turn an adhoc column into a sqlalchemy column.
         :param col: Adhoc column definition
         :param template_processor: template_processor instance
-        :returns: The metric defined as a sqlalchemy column
-        :rtype: sqlalchemy.sql.column
+        :returns: A tuple of (SQLAlchemy column, generic column type). The
+            generic type is resolved from query result column metadata when
+            the adhoc label matches a known column; otherwise ``None``.
+        :rtype: tuple[sqlalchemy.sql.ColumnElement, Optional[GenericDataType]]
         """
         label = get_column_name(col)
         expression = self._process_sql_expression(
             expression=col["sqlExpression"],
             database_id=self.database_id,
+            engine=self.database.backend,
             schema=self.schema,
             template_processor=template_processor,
         )
         sqla_column = literal_column(expression)
-        return self.make_sqla_column_compatible(sqla_column, label)
+        col_meta = next((c for c in self.columns if c.column_name == label), None)
+        generic_type = col_meta.type_generic if col_meta else None
+        return self.make_sqla_column_compatible(sqla_column, label), generic_type
 
 
 class SavedQuery(
+    CoreSavedQuery,
     SqlTablesMixin,
     AuditMixinNullable,
     ExtraJSONMixin,
     ImportExportMixin,
-    Model,
 ):
     """ORM model for SQL query"""
 
@@ -390,6 +453,7 @@ class SavedQuery(
     user_id = Column(Integer, ForeignKey("ab_user.id"), nullable=True)
     db_id = Column(Integer, ForeignKey("dbs.id"), nullable=True)
     schema = Column(String(128))
+    catalog = Column(String(256), nullable=True, default=None)
     label = Column(String(256))
     description = Column(Text)
     sql = Column(MediumText())
@@ -409,14 +473,16 @@ class SavedQuery(
     tags = relationship(
         "Tag",
         secondary="tagged_object",
-        overlaps="tags",
-        primaryjoin="and_(SavedQuery.id == TaggedObject.object_id)",
-        secondaryjoin="and_(TaggedObject.tag_id == Tag.id, "
+        overlaps="objects,tag,tags",
+        primaryjoin="and_(SavedQuery.id == TaggedObject.object_id, "
         "TaggedObject.object_type == 'query')",
+        secondaryjoin="TaggedObject.tag_id == Tag.id",
+        viewonly=True,  # cascading deletion already handled by superset.tags.models.ObjectUpdater.after_delete  # noqa: E501
     )
 
     export_parent = "database"
     export_fields = [
+        "catalog",
         "schema",
         "label",
         "description",
@@ -478,6 +544,7 @@ class TabState(AuditMixinNullable, ExtraJSONMixin, Model):
     database_id = Column(Integer, ForeignKey("dbs.id", ondelete="CASCADE"))
     database = relationship("Database", foreign_keys=[database_id])
     schema = Column(String(256))
+    catalog = Column(String(256), nullable=True, default=None)
 
     # tables that are open in the schema browser and their data previews
     table_schemas = relationship(
@@ -493,7 +560,7 @@ class TabState(AuditMixinNullable, ExtraJSONMixin, Model):
 
     # latest query that was run
     latest_query_id = Column(
-        Integer, ForeignKey("query.client_id", ondelete="SET NULL")
+        String(11), ForeignKey("query.client_id", ondelete="SET NULL")
     )
     latest_query = relationship("Query")
 
@@ -515,6 +582,7 @@ class TabState(AuditMixinNullable, ExtraJSONMixin, Model):
             "label": self.label,
             "active": self.active,
             "database_id": self.database_id,
+            "catalog": self.catalog,
             "schema": self.schema,
             "table_schemas": [ts.to_dict() for ts in self.table_schemas],
             "sql": self.sql,
@@ -539,6 +607,7 @@ class TableSchema(AuditMixinNullable, ExtraJSONMixin, Model):
     )
     database = relationship("Database", foreign_keys=[database_id])
     schema = Column(String(256))
+    catalog = Column(String(256), nullable=True, default=None)
     table = Column(String(256))
 
     # JSON describing the schema, partitions, latest partition, etc.
@@ -556,6 +625,7 @@ class TableSchema(AuditMixinNullable, ExtraJSONMixin, Model):
             "id": self.id,
             "tab_state_id": self.tab_state_id,
             "database_id": self.database_id,
+            "catalog": self.catalog,
             "schema": self.schema,
             "table": self.table,
             "description": description,
