@@ -67,7 +67,8 @@ FEATURE_FLAGS = {
     # ADHOC_DASHBOARD_NATIVE_FILTERS removed: flag no longer exists in 6.x
     # (adhoc dashboard native filters are standard behavior).
     "CHART_PLUGINS_EXPERIMENTAL": True,
-    "DASHBOARD_VIRTUALIZATION": False
+    "DASHBOARD_VIRTUALIZATION": False,
+    "SSH_TUNNELING": True,
 }
 
 ALERT_REPORTS_NOTIFICATION_DRY_RUN = True
