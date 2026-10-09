@@ -79,6 +79,14 @@ SQLLAB_CTAS_NO_LIMIT = True
 # Fork override (was a core patch on 4.0.2; config-only since 6.1.0 upgrade):
 # large dashboards exceed the default position-data size limit.
 SUPERSET_DASHBOARD_POSITION_DATA_LIMIT = 85535
+
+# ------------------ MCP service (AI integration) ---------------------
+# Consumed by the `superset-mcp` deployment (`superset mcp run`, port 5008).
+# Dev-mode auth: every MCP request acts as this one Superset user, so the
+# service is ClusterIP-only (reach it via kubectl port-forward, no ingress).
+# No 'admin' default on prod: set MCP_DEV_USERNAME in superset-secret to a
+# dedicated user whose role limits what MCP clients can see and change.
+MCP_DEV_USERNAME = os.getenv('MCP_DEV_USERNAME')
 # ------------------ Embedded Configurations --------------------
 
 BASE_URL = os.getenv('SUPERSET_URL')

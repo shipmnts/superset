@@ -42,3 +42,49 @@ spec:
       port: 8088
       targetPort: 8088
       nodePort: 30080
+---
+# MCP service (AI integration): `superset mcp run` as its own deployment, same
+# image + secret as the app. ClusterIP only — do not add an ingress route while
+# MCP auth is dev-mode (see MCP_DEV_USERNAME in superset-config.py).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: superset-mcp
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: superset-mcp
+  template:
+    metadata:
+      labels:
+        app: superset-mcp
+    spec:
+      imagePullSecrets:
+        - name: acr-pull
+      containers:
+        - name: superset-mcp
+          image: shipmnts.azurecr.io/shipmnts/superset:__tag__
+          command: ["superset"]
+          args: ["mcp", "run", "--host", "0.0.0.0", "--port", "5008"]
+          ports:
+            - containerPort: 5008
+          envFrom:
+            - secretRef:
+                name: superset-secret
+          imagePullPolicy: "Always"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: superset-mcp-service
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app: superset-mcp
+  ports:
+    - name: mcp
+      port: 80
+      targetPort: 5008
