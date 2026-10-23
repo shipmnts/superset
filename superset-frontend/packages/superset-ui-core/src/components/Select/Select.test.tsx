@@ -981,8 +981,8 @@ test('abbreviates large numbers in bulk action buttons', async () => {
   }));
   render(<Select {...defaultProps} mode="multiple" options={manyOptions} />);
   await open();
-  // SMART_NUMBER format uses lowercase 'k' for thousands (d3-format)
-  expect(await screen.findByText('Select all (1.5k)')).toBeInTheDocument();
+  // SMART_NUMBER defaults to the Indian format (uppercase 'K') when no tenant_country is set
+  expect(await screen.findByText('Select all (1.5K)')).toBeInTheDocument();
 });
 
 test('dropdown takes full width of the select input for multi select', async () => {

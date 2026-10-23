@@ -19,13 +19,56 @@
 
 import { NumberFormatter, createSmartNumberFormatter } from '@superset-ui/core';
 
+const originalLocation = window.location;
+
+function setLocationSearch(search: string) {
+  Object.defineProperty(window, 'location', {
+    configurable: true,
+    value: new URL(`http://localhost/${search}`),
+  });
+}
+
+function restoreLocation() {
+  Object.defineProperty(window, 'location', {
+    configurable: true,
+    value: originalLocation,
+  });
+}
+
 describe('createSmartNumberFormatter(options)', () => {
   test('creates an instance of NumberFormatter', () => {
     const formatter = createSmartNumberFormatter();
     expect(formatter).toBeInstanceOf(NumberFormatter);
   });
-  describe('using default options', () => {
-    const formatter = createSmartNumberFormatter();
+
+  describe('when tenant_country is absent, defaults to the Indian number format', () => {
+    let formatter: (value: number) => string;
+
+    beforeAll(() => {
+      setLocationSearch('');
+      formatter = createSmartNumberFormatter();
+    });
+
+    afterAll(restoreLocation);
+
+    test('formats thousands, lakhs and crores', () => {
+      expect(formatter(1000)).toBe('1K');
+      expect(formatter(1234567)).toBe('12.3L');
+      expect(formatter(45600000)).toBe('4.56Cr');
+      expect(formatter(-1234567)).toBe('-12.3L');
+    });
+  });
+
+  describe('when tenant_country is a non-IN country, uses SI format', () => {
+    let formatter: (value: number) => string;
+
+    beforeAll(() => {
+      setLocationSearch('?tenant_country=US');
+      formatter = createSmartNumberFormatter();
+    });
+
+    afterAll(restoreLocation);
+
     test('formats 0 correctly', () => {
       expect(formatter(0)).toBe('0');
     });
@@ -108,8 +151,16 @@ describe('createSmartNumberFormatter(options)', () => {
     });
   });
 
-  describe('when options.signed is true, it adds + for positive numbers', () => {
-    const formatter = createSmartNumberFormatter({ signed: true });
+  describe('when options.signed is true and tenant_country is non-IN, it adds + for positive numbers', () => {
+    let formatter: (value: number) => string;
+
+    beforeAll(() => {
+      setLocationSearch('?tenant_country=US');
+      formatter = createSmartNumberFormatter({ signed: true });
+    });
+
+    afterAll(restoreLocation);
+
     test('formats 0 correctly', () => {
       expect(formatter(0)).toBe('0');
     });
@@ -152,25 +203,16 @@ describe('createSmartNumberFormatter(options)', () => {
   });
 
   describe('when tenant_country=IN, uses the Indian number format', () => {
-    const originalLocation = window.location;
     let formatter: (value: number) => string;
     let signedFormatter: (value: number) => string;
 
     beforeAll(() => {
-      Object.defineProperty(window, 'location', {
-        configurable: true,
-        value: new URL('http://localhost/?tenant_country=IN'),
-      });
+      setLocationSearch('?tenant_country=IN');
       formatter = createSmartNumberFormatter();
       signedFormatter = createSmartNumberFormatter({ signed: true });
     });
 
-    afterAll(() => {
-      Object.defineProperty(window, 'location', {
-        configurable: true,
-        value: originalLocation,
-      });
-    });
+    afterAll(restoreLocation);
 
     test('formats 0 correctly', () => {
       expect(formatter(0)).toBe('0');

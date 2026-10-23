@@ -87,7 +87,8 @@ export default function createSmartNumberFormatter(
   const getSign = signed ? (value: number) => (value > 0 ? '+' : '') : () => '';
   const urlParams = new URLSearchParams(window.location.search);
   const existingParams = Object.fromEntries(urlParams.entries());
-  const isIndiaCountryTenant = existingParams?.tenant_country === 'IN';
+  const tenantCountry = existingParams?.tenant_country;
+  const isIndiaCountryTenant = !tenantCountry || tenantCountry === 'IN';
 
   return new NumberFormatter({
     description,

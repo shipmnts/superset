@@ -53,7 +53,7 @@ describe('NumberFormatterRegistrySingleton', () => {
       expect(output).toEqual('12.3k');
     });
     test('falls back to the default formatter if the format is undefined', () => {
-      expect(formatNumber(undefined, 1000)).toEqual('1k');
+      expect(formatNumber(undefined, 1000)).toEqual('1K');
     });
   });
   describe('setD3Format()', () => {
